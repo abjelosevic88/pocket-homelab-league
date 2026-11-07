@@ -20,7 +20,9 @@ jobs:
           go vet ./...
           go test ./...
       - name: Build binary
-        run: CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o pocket-league ./cmd/pocket-league
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o /dev/null ./cmd/pocket-league
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o pocket-league ./cmd/pocket-league
       - name: Smoke test
         run: |
           DATA_DIR=/tmp/pbg DEMO_DATA=true AUTH_MODE=none ./pocket-league &

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/abjelosevic88/pocket-homelab-league/internal/store"
@@ -126,7 +127,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 // tellChat tells the people who don't have League open about a message.
 func (s *Server) tellChat(g *store.Group, from int64, n note) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30e9)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	s.tellGroup(ctx, g, from, n)
 }

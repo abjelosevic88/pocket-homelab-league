@@ -256,7 +256,7 @@ func dayWord(t, now time.Time) string {
 
 func untilWords(d time.Duration) string {
 	h := int(d.Round(30*time.Minute) / time.Hour)
-	m := int(d.Round(30*time.Minute)%time.Hour) / int(time.Minute)
+	m := int((d.Round(30*time.Minute) % time.Hour) / time.Minute)
 	switch {
 	case h == 0:
 		return fmt.Sprintf("%d minutes", max(int(d/time.Minute), 1))
