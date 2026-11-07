@@ -437,6 +437,8 @@ func (s *Server) syncCalendarLater(gameID int64, drop bool) {
 // syncCalendar: the people who are in have the game in their calendar
 // (when they want that), at its current time; the others don't.
 func (s *Server) syncCalendar(ctx context.Context, gameID int64) {
+	s.calMu.Lock()
+	defer s.calMu.Unlock()
 	gm, err := s.store.GameByID(ctx, gameID)
 	if err != nil {
 		return
@@ -474,6 +476,8 @@ func (s *Server) syncCalendar(ctx context.Context, gameID int64) {
 
 // dropCalendar removes a game from everyone's calendar (it is going away).
 func (s *Server) dropCalendar(ctx context.Context, gameID int64) {
+	s.calMu.Lock()
+	defer s.calMu.Unlock()
 	have, _ := s.store.MadeCalendarFor(ctx, gameID)
 	for i := range have {
 		s.removeFromCalendar(ctx, have[i].UserID, &have[i])

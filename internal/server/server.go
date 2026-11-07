@@ -41,6 +41,7 @@ type Server struct {
 	mailer func(ctx context.Context, uid int64, m outMail) error
 
 	planMu sync.Mutex // one round of planning and reminders at a time
+	calMu  sync.Mutex // one calendar sync at a time (quick in/out taps must not make two events)
 
 	oidcMu sync.Mutex
 	oidc   *oidcProvider // for the issuer in use; rebuilt when it changes

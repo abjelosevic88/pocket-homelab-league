@@ -357,11 +357,11 @@ func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ids, _ := s.store.MemberIDs(ctx, g.ID)
+	// the coming games leave everyone's calendars before the group goes
 	games, _ := s.store.ListGames(ctx, actorID(ctx), store.GameFilter{GroupID: g.ID, Upcoming: true})
 	for _, gm := range games {
-		s.syncCalendarLater(gm.ID, true)
+		s.dropCalendar(ctx, gm.ID)
 	}
-	time.Sleep(10 * time.Millisecond)
 	if err := s.store.DeleteGroup(ctx, g.ID); err != nil {
 		s.fail(w, err, "delete group")
 		return
@@ -643,9 +643,14 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 // is deleted with it (it only existed for the group), keeping the results.
 func (s *Server) removeMember(ctx context.Context, g *store.Group, uid, by int64) {
 	m, _ := s.store.GetMember(ctx, g.ID, uid)
+	coming, _ := s.store.ListGames(ctx, uid, store.GameFilter{GroupID: g.ID, Upcoming: true})
 	if err := s.store.RemoveMember(ctx, g.ID, uid); err != nil {
 		s.log.Warn("remove member", "err", err)
 		return
+	}
+	// their answers are gone: so are those games from their calendar
+	for _, gm := range coming {
+		s.syncCalendarLater(gm.ID, false)
 	}
 	if m != nil {
 		what := m.Display() + " left the group"
