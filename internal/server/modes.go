@@ -10,7 +10,7 @@ import (
 // ---- connection modes on Pocket Core's map ----
 //
 // Core can switch its own links but cannot see a URL and token pasted into
-// Forms, so Forms tells it how each person actually connects to each
+// League, so League tells it how each person actually connects to each
 // Pocket app: "core", "direct" or "off", the mode in effect
 // (what Settings shows, defaults included). Reported after each registration
 // (on start and every 30 minutes) and right after a person changes a mode or

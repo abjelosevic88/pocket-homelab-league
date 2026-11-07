@@ -203,7 +203,6 @@ a.list-row:hover, .list-row:has(> a.row-main:hover) { background: var(--hover); 
 .chip-x:hover { color: var(--danger); }
 .file-btn { align-self: flex-start; cursor: pointer; }
 .sb-nav-item.dim { opacity: .6; }
-.sb-stage-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin: 0 4px 0 3px; }
 
 /* the form */
 .form-sec { display: grid; gap: 10px; }

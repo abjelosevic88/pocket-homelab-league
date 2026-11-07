@@ -36,16 +36,12 @@
   ],
   "shortcuts": [
     {
-      "name": "Today",
-      "url": "/"
+      "name": "Games",
+      "url": "/games"
     },
     {
-      "name": "Pipeline",
-      "url": "/pipeline"
-    },
-    {
-      "name": "New deal",
-      "url": "/deals/new"
+      "name": "Results",
+      "url": "/results"
     }
   ]
 }

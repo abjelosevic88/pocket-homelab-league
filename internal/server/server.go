@@ -221,7 +221,7 @@ func (s *Server) coreLoop(ctx context.Context) {
 	}
 }
 
-// eventTopics are what CRM publishes on the Core bus.
+// eventTopics are what League publishes on the Core bus.
 var eventTopics = []string{"league.game_planned", "league.game_changed", "league.game_cancelled", "league.vote_started",
 	"league.answered", "league.short", "league.result", "league.reminder"}
 

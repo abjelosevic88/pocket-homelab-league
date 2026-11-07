@@ -1,5 +1,5 @@
 [Unit]
-Description=Pocket League — deals from the first talk to signed
+Description=Pocket League — sport with friends: games, scores, tables and a chat
 After=network-online.target
 Wants=network-online.target
 

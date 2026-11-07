@@ -11,7 +11,7 @@ import (
 	"github.com/abjelosevic88/pocket-homelab-league/internal/store"
 )
 
-// Pocket Core app links (docs/links.md in pocket-homelab-core), CRM as
+// Pocket Core app links (docs/links.md in pocket-homelab-core), League as
 // the target: another Pocket app the person allowed in Core may act here for
 // them with a pcx_ token, only within these scopes. Every route not listed
 // in linkRoutes stays closed to it (403).

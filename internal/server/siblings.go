@@ -224,7 +224,7 @@ func stateOf(reason string) (state, fix string) {
 	case "off_admin":
 		return "link_off", "Switch the link on in Pocket Core → Links"
 	case "target_missing":
-		return "missing", "Install it and connect it to Pocket Core; until then the deal keeps this here"
+		return "missing", "Install it and connect it to Pocket Core; until then League works without it"
 	case "not_offered":
 		return "old", "Update it to the newest version"
 	case "not_declared":
