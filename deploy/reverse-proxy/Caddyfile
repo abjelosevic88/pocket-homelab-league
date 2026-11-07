@@ -1,0 +1,4 @@
+# Pocket League behind Caddy.
+league.example.com {
+	reverse_proxy pocket-league:8080
+}

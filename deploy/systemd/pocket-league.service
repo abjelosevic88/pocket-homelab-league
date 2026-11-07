@@ -1,0 +1,23 @@
+[Unit]
+Description=Pocket League — deals from the first talk to signed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pocket-league
+Group=pocket-league
+ExecStart=/usr/local/bin/pocket-league
+Environment=DATA_DIR=/var/lib/pocket-league
+Environment=PORT=8080
+Environment=BASE_URL=https://league.example.com
+Environment=SECURE_COOKIES=true
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pocket-league
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
