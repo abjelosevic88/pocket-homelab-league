@@ -135,7 +135,7 @@ func ParsePoint(p string) (string, int, bool) {
 
 // Live replays the points.
 func Live(r LiveRules, points []string) LiveView {
-	var v LiveView
+	v := LiveView{Sets: [][2]int{}}
 	r = r.Clean()
 	v.Total = len(points)
 	switch r.Kind {

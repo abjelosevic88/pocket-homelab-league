@@ -267,7 +267,7 @@ function Who({ d, by, silent, org, me, onAnswer, onNoShow, onChanged }: { d: Gam
   const removeGuest = async (x: Guest) => { try { onChanged(await api.del<GameDetail>(`${V1}/games/${gm.id}/guests/${x.id}`)); announceChange() } catch (e) { toast((e as Error).message, 'err') } }
   const guests = (a: 'in' | 'waiting') => d.guests.filter(x => x.answer === a).map(x => (
     <div key={`g${x.id}`} className="who guest">
-      <Avatar name={x.name} size={26} />
+      <Avatar name={x.name.replace(/\s*\(.*\)\s*/g, ' ').trim()} size={26} />
       <span className="grow min0"><span className="ellipsis block-line">{x.name}</span><span className="muted small ellipsis block-line">guest of {x.added_by_name?.split(' ')[0] || 'someone'}</span></span>
       {(x.added_by === me || d.can_edit) && !started && <button type="button" className="btn ghost icon-only sm" aria-label={`Take ${x.name} off`} title="Take off" onClick={() => removeGuest(x)}><Icon name="x" size={14} /></button>}
     </div>

@@ -167,6 +167,13 @@ func TestLinkScopes(t *testing.T) {
 		{"GET", "/api/v1/auth/me", nil, true},
 		{"GET", "/api/v1/tournaments/4", []string{"league:read"}, true},
 		{"POST", "/api/v1/tmatches/4/result", []string{"league:read", "league:write"}, false},
+		{"GET", "/api/v1/groups/3/seasons", []string{"league:read"}, true},
+		{"GET", "/api/v1/groups/3/money", []string{"league:read"}, true},
+		{"GET", "/api/v1/subs", []string{"league:read"}, true},
+		{"POST", "/api/v1/subs/3", []string{"league:read", "league:write"}, false},
+		{"POST", "/api/v1/live/3/point", []string{"league:read", "league:write"}, false},
+		{"POST", "/api/v1/groups/3/money", []string{"league:read", "league:write"}, false},
+		{"GET", "/api/v1/photos/3", []string{"league:read"}, false},
 	} {
 		r, _ := http.NewRequest(c.m, c.p, nil)
 		if got := linkAllows(c.scopes, r); got != c.ok {

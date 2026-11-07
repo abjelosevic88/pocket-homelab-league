@@ -7,7 +7,7 @@ import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { useLiveEvents } from '../lib/data'
 import { fmtDate } from '../lib/format'
-import { money } from '../lib/league'
+import { money as fmtMoney } from '../lib/league'
 import type { Group } from '../lib/types'
 import { Icon } from './icons'
 import { Select } from './Select'
@@ -16,6 +16,9 @@ import { Avatar, Empty, Loading, Modal, Segmented, useToast } from './ui'
 interface Balance { user_id: number; name: string; charged: number; paid: number; pending: number; owes: number }
 interface Entry { id: number; user_id: number; name: string; kind: 'charge' | 'payment'; amount_cents: number; currency: string; game_id: number; tournament_id: number; note: string; by_name: string; confirmed_at: string | null; created_at: string; game_at?: string; tournament?: string }
 interface Money { currency: string; pay_note: string; charge_games: boolean; balances: Balance[]; entries: Entry[]; total_charged: number; outstanding: number; can_edit: boolean }
+
+/** Like money(), but 0 is written out too. */
+const money = (cents: number, cur: string) => cents ? fmtMoney(cents, cur) : `0 ${cur === 'BAM' ? 'KM' : cur}`
 
 export function MoneyTab({ g, onEditGroup }: { g: Group; onEditGroup: () => void }) {
   const { user } = useApp()
@@ -43,7 +46,7 @@ export function MoneyTab({ g, onEditGroup }: { g: Group; onEditGroup: () => void
     <div className="stack loose">
       <div className="money-head card pad-card">
         <div className="grow min0">
-          <div className="muted small">{mine && mine.owes < 0 ? 'You are ahead' : 'You owe'}</div>
+          <div className="muted small">{!mine || mine.owes === 0 ? 'You are even' : mine.owes < 0 ? 'You are ahead' : 'You owe'}</div>
           <div className={`money-big ${mine && mine.owes > 0 ? 'owe' : ''}`}>{money(Math.abs(mine?.owes || 0), cur)}</div>
           {mine && mine.pending > 0 && <div className="muted small">{money(mine.pending, cur)} paid, waiting for an organiser</div>}
         </div>

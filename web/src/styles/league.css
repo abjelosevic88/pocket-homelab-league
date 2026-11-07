@@ -601,7 +601,8 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .duty-row:last-child { border-bottom: 0; }
 .duty-row .done { text-decoration: line-through; color: var(--muted); }
 .duty-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px dashed var(--border); flex-shrink: 0; }
-.duty-sel { min-width: 150px; }
+.duty-row > .grow { flex: 1 1 auto; min-width: 110px; }
+.sel.duty-sel { flex: 0 0 auto; width: min(210px, 45%); }
 .sub-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .sub-row:last-child { border-bottom: 0; }
 .sub-emoji { font-size: 22px; }
@@ -633,7 +634,7 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .stat-in td, .stat-in th { padding: 5px 8px; }
 
 /* seasons */
-.season-sel { min-width: 170px; }
+.sel.season-sel { width: auto; min-width: 190px; flex: 0 0 auto; }
 .awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .award { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
 .award.medal { background: color-mix(in srgb, #fab005 10%, var(--surface)); border-color: color-mix(in srgb, #fab005 35%, var(--border)); }
@@ -662,3 +663,7 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .live-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 650; color: var(--danger); font-variant-numeric: tabular-nums; }
 .live-open { display: grid; gap: 4px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; }
 .tm-live { margin: 4px 0 2px; max-width: 420px; }
+.sec-head { flex-wrap: wrap; row-gap: 6px; }
+.sec-head h3 { white-space: nowrap; }
+@media (max-width: 640px) { .who-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+.who > .grow { overflow: hidden; }

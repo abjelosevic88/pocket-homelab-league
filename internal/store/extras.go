@@ -101,18 +101,23 @@ type Reliability struct {
 const sinceJoined = `min(substr(m.joined_at, 1, 16), COALESCE((SELECT MIN(g2.starts_at) FROM answers a2 JOIN games g2 ON g2.id = a2.game_id
 	WHERE a2.user_id = m.user_id AND g2.group_id = m.group_id), '9999'))`
 
-// GroupReliability counts, for everyone in a group, the past planned games
-// since they joined.
-func (s *Store) GroupReliability(ctx context.Context, gid int64, before string) (map[int64]*Reliability, error) {
+// GroupReliability counts, for everyone in a group, the planned games
+// between from and before ("" = since they joined).
+func (s *Store) GroupReliability(ctx context.Context, gid int64, from, before string) (map[int64]*Reliability, error) {
+	// late drop-outs and no-shows count at once (also for a game still to come), unless it's a stretch of time
+	upper := "9999"
+	if from != "" {
+		upper = before
+	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT m.user_id,
-		(SELECT COUNT(1) FROM games g WHERE g.group_id = m.group_id AND g.status = 'planned' AND g.starts_at < ? AND g.starts_at >= `+sinceJoined+`),
-		(SELECT COUNT(1) FROM answers a JOIN games g ON g.id = a.game_id WHERE g.group_id = m.group_id AND g.status = 'planned' AND g.starts_at < ? AND a.user_id = m.user_id AND a.answer = 'in' AND a.no_show = 0),
-		(SELECT COUNT(DISTINCT l.game_id) FROM answer_log l JOIN games g ON g.id = l.game_id WHERE g.group_id = m.group_id AND l.user_id = m.user_id AND l.late = 1
+		(SELECT COUNT(1) FROM games g WHERE g.group_id = m.group_id AND g.status = 'planned' AND g.starts_at < ? AND g.starts_at >= max(`+sinceJoined+`, ?)),
+		(SELECT COUNT(1) FROM answers a JOIN games g ON g.id = a.game_id WHERE g.group_id = m.group_id AND g.status = 'planned' AND g.starts_at < ? AND g.starts_at >= ? AND a.user_id = m.user_id AND a.answer = 'in' AND a.no_show = 0),
+		(SELECT COUNT(DISTINCT l.game_id) FROM answer_log l JOIN games g ON g.id = l.game_id WHERE g.group_id = m.group_id AND l.user_id = m.user_id AND l.late = 1 AND g.starts_at >= ? AND g.starts_at < ?
 			AND COALESCE((SELECT a.answer FROM answers a WHERE a.game_id = l.game_id AND a.user_id = l.user_id), '') <> 'in'),
-		(SELECT COUNT(1) FROM answers a JOIN games g ON g.id = a.game_id WHERE g.group_id = m.group_id AND a.user_id = m.user_id AND a.no_show = 1),
-		(SELECT COUNT(1) FROM games g WHERE g.group_id = m.group_id AND g.status = 'planned' AND g.starts_at < ? AND g.starts_at >= `+sinceJoined+`
+		(SELECT COUNT(1) FROM answers a JOIN games g ON g.id = a.game_id WHERE g.group_id = m.group_id AND a.user_id = m.user_id AND a.no_show = 1 AND g.starts_at >= ? AND g.starts_at < ?),
+		(SELECT COUNT(1) FROM games g WHERE g.group_id = m.group_id AND g.status = 'planned' AND g.starts_at < ? AND g.starts_at >= max(`+sinceJoined+`, ?)
 			AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.game_id = g.id AND a.user_id = m.user_id))
-		FROM members m WHERE m.group_id = ?`, before, before, before, gid)
+		FROM members m WHERE m.group_id = ?`, before, from, before, from, from, upper, from, upper, before, from, gid)
 	if err != nil {
 		return nil, err
 	}

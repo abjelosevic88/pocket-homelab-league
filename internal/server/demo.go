@@ -376,6 +376,7 @@ func (s *Server) seedDemo(ctx context.Context, owner int64) error {
 			_ = s.store.MarkRead(ctx, g.ID, owner, ms[len(ms)-3].ID)
 		}
 	}
+	s.demoExtras(ctx, owner, ids, tennis, football, tg, fg)
 	s.demoTournaments(ctx, owner, tennis, padel, football, rnd)
 	s.log.Info("demo data seeded", "groups", 3, "people", len(ids))
 	_ = fmt.Sprint
@@ -477,4 +478,50 @@ func (s *Server) demoTournaments(ctx context.Context, owner int64, tennis, padel
 			_ = s.store.SaveEntry(ctx, &store.TEntry{TournamentID: t.ID, Name: "Team " + firstName(ms[i].Display()), Members: mem, CreatedBy: owner, Paid: i == 0})
 		}
 	}
+}
+
+// demoExtras: chores for the tennis, a guest and accounts for the
+// five-a-side, its seasons (one closed with awards), someone away.
+func (s *Server) demoExtras(ctx context.Context, owner int64, ids []int64, tennis, football *store.Group, tg, fg *store.Game) {
+	now := time.Now()
+	_ = s.store.SetDuties(ctx, tennis.ID, []string{"Bring the balls", "Book the court"})
+	if gm, err := s.store.GameByID(ctx, tg.ID); err == nil {
+		s.assignDuties(ctx, tennis, gm, false)
+	}
+	_ = s.store.SetDuties(ctx, football.ID, []string{"Bring the bibs", "Collect the money"})
+	_ = s.store.AddGuest(ctx, &store.Guest{GameID: fg.ID, AddedBy: ids[9], Name: "Mirza (Tarik's brother)", Answer: store.AnswerIn})
+
+	// the five-a-side keeps accounts: the last four games charged, most paid
+	football.ChargeGames, football.PayNote = true, "Cash to Nikola, or Revolut: revolut.me/nikolaj"
+	football.Stats = league.SportByKey(football.Sport).Stats
+	_ = s.store.UpdateGroup(ctx, football)
+	past, _ := s.store.ListGames(ctx, owner, store.GameFilter{GroupID: football.ID, Past: true, Limit: 4})
+	for _, gm := range past {
+		s.chargeGame(ctx, football, gm)
+	}
+	bal, _ := s.store.Balances(ctx, football.ID)
+	i := 0
+	for uid, b := range bal {
+		i++
+		if b.Owes <= 0 || uid == ids[3] || uid == ids[10] {
+			continue // a couple still owe
+		}
+		e := &store.LedgerEntry{GroupID: football.ID, UserID: uid, Kind: "payment", AmountCents: b.Owes, Currency: "BAM", Note: "cash", CreatedBy: uid}
+		if i%4 != 0 {
+			e.ConfirmedBy = ids[5]
+		}
+		_, _ = s.store.AddLedger(ctx, e)
+	}
+
+	// seasons: the summer is over (its table kept), the autumn is on
+	summer := &store.Season{GroupID: football.ID, Name: "Summer 2026", StartsOn: now.AddDate(0, -4, 0).Format("2006-01-02"), EndsOn: now.AddDate(0, -2, -1).Format("2006-01-02")}
+	if s.store.SaveSeason(ctx, summer) == nil {
+		t, ms := s.tableBetween(ctx, football, summer.StartsOn+"T00:00", seasonEnd(summer))
+		rows := s.tableRows(ctx, football, t)
+		_ = s.store.CloseSeason(ctx, summer.ID, summer.EndsOn, map[string]any{"rows": rows, "matches": len(ms)}, s.awards(ctx, football, summer, rows))
+	}
+	_ = s.store.SaveSeason(ctx, &store.Season{GroupID: football.ID, Name: "Autumn 2026", StartsOn: now.AddDate(0, -2, 0).Format("2006-01-02")})
+
+	// Edin is away next week
+	_ = s.store.AddAway(ctx, &store.Away{UserID: ids[3], From: now.AddDate(0, 0, 6).Format("2006-01-02"), To: now.AddDate(0, 0, 13).Format("2006-01-02"), Note: "Holidays"})
 }

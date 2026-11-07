@@ -190,7 +190,7 @@ func (s *Server) handleReliability(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rel, err := s.store.GroupReliability(ctx, g.ID, store.LocalNow())
+	rel, err := s.store.GroupReliability(ctx, g.ID, "", store.LocalNow())
 	if err != nil {
 		s.fail(w, err, "reliability")
 		return

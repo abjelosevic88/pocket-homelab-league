@@ -18,6 +18,9 @@ func rep(s string, n int) string { return strings.Repeat(s, n) }
 func TestLiveTennis(t *testing.T) {
 	r := LiveRulesFor("tennis", ScoringSets)
 	v := Live(r, pts("aab"))
+	if v.Sets == nil {
+		t.Fatal("sets must be a list, never null (the web reads it)")
+	}
 	if v.Point != [2]string{"30", "15"} {
 		t.Fatalf("30–15: %v", v.Point)
 	}

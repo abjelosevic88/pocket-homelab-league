@@ -303,7 +303,7 @@ func (s *Server) awards(ctx context.Context, g *store.Group, x *store.Season, ro
 		best("stat_"+k, info.Icon, "Most "+strings.ToLower(info.Name), func(r tableRow) float64 { return float64(r.Stats[k]) }, func(r tableRow) string { return fmt.Sprintf("%d", r.Stats[k]) }, nil)
 	}
 	// who came most: reliability over the season
-	if rel, err := s.store.GroupReliability(ctx, g.ID, x.EndsOn+"T99"); err == nil {
+	if rel, err := s.store.GroupReliability(ctx, g.ID, x.StartsOn, x.EndsOn+"T99"); err == nil {
 		var top *store.Reliability
 		for _, r := range rel {
 			if r.Came > 0 && (top == nil || r.Came > top.Came || (r.Came == top.Came && r.LateOuts+r.NoShows < top.LateOuts+top.NoShows)) {
