@@ -571,3 +571,24 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .title-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 99px; border: 1px solid color-mix(in srgb, #e8a400 45%, var(--border)); background: color-mix(in srgb, #e8a400 7%, var(--surface)); color: var(--text); font-weight: 600; font-size: 13px; }
 .title-chip:hover { border-color: #e8a400; }
 .tm.bye { padding-top: 6px; padding-bottom: 6px; }
+
+/* notifications on this phone */
+.push-nudge { display: flex; align-items: center; gap: 12px; padding: 12px 14px; flex-wrap: wrap; }
+.push-nudge .set-app-ico { background: var(--accent-soft); color: var(--accent-ink); }
+.push-nudge .grow { min-width: 200px; }
+.push-nudge p { margin: 2px 0 0; }
+
+/* photos in the chat */
+.msg-photos { display: grid; gap: 3px; margin: -3px -7px 4px; border-radius: 13px; overflow: hidden; width: min(300px, 62vw); }
+.msg-photos.n2, .msg-photos.n4 { grid-template-columns: 1fr 1fr; }
+.msg-photos.n3 { grid-template-columns: 1fr 1fr 1fr; }
+.msg-photo { display: block; padding: 0; border: 0; background: var(--surface-3, var(--border)); cursor: zoom-in; width: 100%; max-height: 360px; overflow: hidden; }
+.msg-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.composer-photos { display: flex; gap: 8px; padding: 10px 12px 0; border-top: 1px solid var(--border); background: var(--surface); overflow-x: auto; }
+.composer-photos + .composer { border-top: 0; }
+.composer-photo { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
+.composer-photo img { width: 100%; height: 100%; object-fit: cover; }
+.composer-photo.pending img { opacity: .45; }
+.composer-photo .btn { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; border: 0; }
+.composer .composer-add { background: transparent; color: var(--muted); }
+.photo-full { display: block; width: 100%; max-height: 72vh; object-fit: contain; border-radius: 10px; background: var(--surface-2); }

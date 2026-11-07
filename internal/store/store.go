@@ -158,6 +158,11 @@ func (s *Store) Counts(ctx context.Context) map[string]int {
 // Now returns the current UTC time formatted for storage.
 func Now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 
+// Ago is a moment so many hours back, as stored.
+func Ago(hours int) string {
+	return time.Now().UTC().Add(-time.Duration(hours) * time.Hour).Format("2006-01-02T15:04:05.000Z")
+}
+
 // Today returns today's date (local) as YYYY-MM-DD.
 func Today() string { return time.Now().Format("2006-01-02") }
 

@@ -75,6 +75,12 @@ func (s *Server) Router() http.Handler {
 				r.Put("/auth/me", s.handleUpdateMe)
 
 				r.Get("/sports", s.handleSports)
+				r.Post("/groups/{id}/photos", s.handleUploadPhoto)
+				r.Get("/photos/{id}", s.handlePhoto)
+				r.Get("/push/key", s.handlePushKey)
+				r.Post("/push/subscribe", s.handlePushSubscribe)
+				r.Post("/push/unsubscribe", s.handlePushUnsubscribe)
+				r.Post("/push/test", s.handlePushTest)
 
 				// groups and their people
 				r.Get("/groups", s.handleListGroups)
@@ -346,6 +352,10 @@ func (s *Server) handleSPA(w http.ResponseWriter, r *http.Request) {
 		f.Close()
 		if strings.HasPrefix(path, "assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		if path == "sw.js" {
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Service-Worker-Allowed", "/")
 		}
 		http.FileServerFS(s.webFS).ServeHTTP(w, r)
 		return

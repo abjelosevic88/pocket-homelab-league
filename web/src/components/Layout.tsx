@@ -14,6 +14,7 @@ import { ResultForm } from './ResultForm'
 import { TournamentForm } from './TournamentForm'
 import { Avatar, Loading, type MenuItem, MenuButton, modalOpen, useIsMobile, useMediaQuery } from './ui'
 import { AskButton } from './AskButton'
+import { pushRefresh } from '../lib/push'
 
 export { announceChange, useOnChange } from '../lib/data'
 
@@ -57,6 +58,7 @@ function Shell() {
   const [sidebarOpen, setSidebarOpen] = useState(() => !drawer && localStorage.getItem(SIDEBAR_KEY) !== '0')
   useEffect(() => { setSidebarOpen(!drawer && localStorage.getItem(SIDEBAR_KEY) !== '0') }, [drawer])
   const drawerOpenedAt = useRef(0)
+  useEffect(() => { if (user) pushRefresh() }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSidebar = () => setSidebarOpen(o => { drawerOpenedAt.current = performance.now(); const n = !o; if (!drawer) localStorage.setItem(SIDEBAR_KEY, n ? '1' : '0'); return n })
   const closeDrawer = () => { if (drawer) setSidebarOpen(false) }
   useEffect(() => { document.querySelector('.content')?.scrollTo({ top: 0 }) }, [loc.pathname])

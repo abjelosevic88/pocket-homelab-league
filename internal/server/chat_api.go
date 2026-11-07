@@ -72,17 +72,32 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	u := userFrom(ctx)
 	var in struct {
-		Body     string `json:"body"`
-		GameID   int64  `json:"game_id"`
-		ReplyTo  int64  `json:"reply_to"`
-		ClientID string `json:"client_id"`
+		Body     string  `json:"body"`
+		GameID   int64   `json:"game_id"`
+		ReplyTo  int64   `json:"reply_to"`
+		ClientID string  `json:"client_id"`
+		Photos   []int64 `json:"photos"`
 	}
 	if err := decode(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 	in.Body = strings.TrimSpace(in.Body)
-	if in.Body == "" {
+	if len(in.Photos) > maxPhotos {
+		writeErr(w, http.StatusBadRequest, "up to 6 photos in one message")
+		return
+	}
+	photos := []map[string]any{}
+	for _, id := range in.Photos {
+		if !s.store.LooseAttachment(ctx, g.ID, u.ID, id) {
+			writeErr(w, http.StatusBadRequest, "a photo is missing — add it again")
+			return
+		}
+		if a, err := s.store.GetAttachment(ctx, id); err == nil {
+			photos = append(photos, photoJSON(a))
+		}
+	}
+	if in.Body == "" && len(photos) == 0 {
 		writeErr(w, http.StatusBadRequest, "write something")
 		return
 	}
@@ -105,12 +120,16 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	m := &store.Message{GroupID: g.ID, GameID: in.GameID, UserID: u.ID, Kind: "text", Body: in.Body, ReplyTo: in.ReplyTo, ClientID: clip(in.ClientID, 64)}
+	if len(photos) > 0 {
+		m.Data, _ = json.Marshal(map[string]any{"photos": photos})
+	}
 	isNew, err := s.store.AddMessage(ctx, m)
 	if err != nil {
 		s.fail(w, err, "send")
 		return
 	}
 	if isNew {
+		s.attachPhotos(ctx, m, in.Photos)
 		_ = s.store.MarkRead(ctx, g.ID, u.ID, m.ID)
 		s.toGroup(ctx, g.ID, "message", m)
 		name := s.nameIn(ctx, g.ID, u.ID)
@@ -120,7 +139,11 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			title = name + " on " + g.Name + ", " + whenText(game.StartsAt)
 			link = s.gameLink(game.ID)
 		}
-		go s.tellChat(g, u.ID, note{kind: "chat", title: title, body: clip(in.Body, 300), link: link, tags: []string{"speech_balloon"}})
+		body := clip(in.Body, 300)
+		if len(photos) > 0 {
+			body = strings.TrimSpace("📷 " + plural(len(photos), "A photo", itoa(int64(len(photos)))+" photos") + "\n" + body)
+		}
+		go s.tellChat(g, u.ID, note{kind: "chat", title: title, body: body, link: link, tags: []string{"speech_balloon"}})
 	}
 	writeJSON(w, http.StatusCreated, m)
 }
@@ -188,6 +211,7 @@ func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "delete")
 		return
 	}
+	s.dropPhotos(ctx, m.ID)
 	m, _ = s.store.GetMessage(ctx, m.ID)
 	s.toGroup(ctx, g.ID, "message_update", m)
 	w.WriteHeader(http.StatusNoContent)

@@ -10,6 +10,7 @@ import { Icon } from '../components/icons'
 import { Select } from '../components/Select'
 import { ShortcutsSheet } from '../components/ShortcutsSheet'
 import { PocketModelSelect } from '../components/PocketModelSelect'
+import { PushRow } from '../components/PushCard'
 import { APP_INFO, CURRENCIES, STATE_WORDS } from '../lib/league'
 
 type TabId = 'general' | 'notifications' | 'apps' | 'email' | 'ai' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
@@ -154,10 +155,13 @@ function Notifications() {
         <SettingRow title="The chat" help="New messages while League is closed. Never by email."><Switch checked={f.notify_chat} onChange={v => setF({ ...f, notify_chat: v })} label="Chat" /></SettingRow>
         {!player && <SettingRow title="Short of players" help="For the groups you organise: the day before, when fewer are in than needed."><Switch checked={f.notify_short} onChange={v => setF({ ...f, notify_short: v })} label="Short of players" /></SettingRow>}
       </Section>
-      <Section title="By email" icon="mail" sub="Without a push address below, these come by email (not the chat) — when the group sends emails.">
+      <Section title="On your phone" icon="smartphone" sub="League can pop up on your phone itself — no other app needed. Switch it on on each phone or computer you use.">
+        <PushRow />
+      </Section>
+      <Section title="By email" icon="mail" sub="Without notifications on a phone or a push address below, these come by email (not the chat) — when the group sends emails.">
         <SettingRow title="Emails" help={user?.email ? `To ${user.email}.` : 'Your account has no email address (Profile).'}><Switch checked={f.email_me} onChange={v => setF({ ...f, email_me: v })} label="Emails" disabled={!user?.email} /></SettingRow>
       </Section>
-      <Section title="Push" icon="smartphone" actions={<span className={`badge ${f.notify_configured ? 'ok' : ''}`}>{f.notify_configured ? 'on' : 'not set'}</span>}
+      <Section title="Push address" icon="send" actions={<span className={`badge ${f.notify_configured ? 'ok' : ''}`}>{f.notify_configured ? 'on' : 'not set'}</span>}
         sub={<>Where messages go instead of email: an Apprise gateway (<code>…/notify/&lt;key&gt;</code>), an ntfy topic URL, or any webhook that takes JSON.</>}>
         <SettingRow title="URL" stack><input value={f.notify_url} onChange={e => setF({ ...f, notify_url: e.target.value })} placeholder="https://ntfy.sh/my-league-topic" /></SettingRow>
         <SettingRow title="Format"><Segmented value={f.notify_format} onChange={v => setF({ ...f, notify_format: v })} options={[{ value: 'apprise', label: 'Apprise' }, { value: 'ntfy', label: 'ntfy' }, { value: 'json', label: 'JSON' }]} size="sm" /></SettingRow>

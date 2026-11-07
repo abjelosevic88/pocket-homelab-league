@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -116,6 +117,10 @@ type groupInput struct {
 	LossPoints   *int     `json:"loss_points"`
 	EmailPlayers *bool    `json:"email_players"`
 	Archived     *bool    `json:"archived"`
+	PayNote      *string  `json:"pay_note"`
+	ChargeGames  *bool    `json:"charge_games"`
+	RatingScope  *string  `json:"rating_scope"`
+	Stats        []string `json:"stats"`
 }
 
 // apply validates and copies the sent fields; "" = fine.
@@ -259,6 +264,30 @@ func (in groupInput) apply(g *store.Group, keys map[string]bool, isNew bool) str
 	if in.Archived != nil {
 		g.Archived = *in.Archived
 	}
+	if in.PayNote != nil {
+		g.PayNote = clip(strings.TrimSpace(*in.PayNote), 500)
+	}
+	if in.ChargeGames != nil {
+		g.ChargeGames = *in.ChargeGames
+	}
+	if in.RatingScope != nil {
+		if *in.RatingScope != "all" && *in.RatingScope != "season" {
+			return "ratings count over all time or per season"
+		}
+		g.RatingScope = *in.RatingScope
+	}
+	if in.Stats != nil {
+		var out []string
+		for _, k := range in.Stats {
+			if league.ValidStat(k) && !oneOf(k, out) {
+				out = append(out, k)
+			}
+		}
+		g.Stats = out
+	}
+	if isNew {
+		g.Stats = league.SportByKey(g.Sport).Stats
+	}
 	return ""
 }
 
@@ -369,6 +398,7 @@ func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "delete group")
 		return
 	}
+	_ = os.RemoveAll(s.photoDir(g.ID))
 	s.toPeople(ids, "group", map[string]any{"id": g.ID, "deleted": true})
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -84,6 +84,10 @@ type Group struct {
 	LossPoints   int      `json:"loss_points"`
 	EmailPlayers bool     `json:"email_players"`
 	Archived     bool     `json:"archived"`
+	PayNote      string   `json:"pay_note"`     // how to pay: an IBAN, a Revolut link
+	ChargeGames  bool     `json:"charge_games"` // charge each player their share after a game
+	RatingScope  string   `json:"rating_scope"` // all | season
+	Stats        []string `json:"stats"`        // the stats kept per player
 	CreatedAt    string   `json:"created_at"`
 	UpdatedAt    string   `json:"updated_at"`
 

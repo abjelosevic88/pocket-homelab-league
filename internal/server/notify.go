@@ -13,9 +13,9 @@ import (
 //
 // Each person chooses what they hear (Settings → Notifications) and, per
 // group, everything / only games / nothing. A message goes to their own
-// notification address (Pocket Alerts, ntfy…); someone without one — most
-// players — gets an email instead when the group allows it and they did not
-// turn emails off, sent the way the group's maker sends email. Chat messages
+// phones (web push) and notification address (Pocket Alerts, ntfy…);
+// someone with neither gets an email instead when the group allows it and
+// they did not turn emails off, sent the way the group's maker sends email. Chat messages
 // are never emailed, and nobody is told about a chat they have open.
 
 // note is one thing to tell people.
@@ -61,8 +61,12 @@ func (s *Server) tell(ctx context.Context, g *store.Group, uids []int64, except 
 		if err != nil || !n.wanted(st) {
 			continue
 		}
+		phones := s.webPush(ctx, uid, n)
 		if st.NotifyURL != "" {
 			s.push(ctx, uid, st, n)
+			continue
+		}
+		if phones > 0 {
 			continue
 		}
 		if n.kind == "chat" || !st.EmailMe || !g.EmailPlayers || m.Email == "" {

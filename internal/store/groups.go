@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 )
 
@@ -15,16 +16,21 @@ import (
 const groupCols = `g.id, g.user_id, g.name, g.sport, g.sport_name, g.scoring, g.format, g.lower_better, g.color, g.description,
 	g.venue_name, g.venue_address, g.venue_lat, g.venue_lon, g.venue_ref, g.outdoor, g.weekday, g.time, g.duration_min, g.plan_days,
 	g.min_players, g.max_players, g.cost_cents, g.currency, g.win_points, g.draw_points, g.loss_points, g.email_players, g.archived,
-	g.created_at, g.updated_at`
+	g.pay_note, g.charge_games, g.rating_scope, g.stats, g.created_at, g.updated_at`
 
 func scanGroup(row interface{ Scan(...any) error }, extra ...any) (*Group, error) {
 	var g Group
+	var stats string
 	dst := []any{&g.ID, &g.UserID, &g.Name, &g.Sport, &g.SportName, &g.Scoring, &g.Format, &g.LowerBetter, &g.Color, &g.Description,
 		&g.VenueName, &g.VenueAddress, &g.VenueLat, &g.VenueLon, &g.VenueRef, &g.Outdoor, &g.Weekday, &g.Time, &g.DurationMin, &g.PlanDays,
 		&g.MinPlayers, &g.MaxPlayers, &g.CostCents, &g.Currency, &g.WinPoints, &g.DrawPoints, &g.LossPoints, &g.EmailPlayers, &g.Archived,
-		&g.CreatedAt, &g.UpdatedAt}
+		&g.PayNote, &g.ChargeGames, &g.RatingScope, &stats, &g.CreatedAt, &g.UpdatedAt}
 	if err := row.Scan(append(dst, extra...)...); err != nil {
 		return nil, notFound(err)
+	}
+	_ = json.Unmarshal([]byte(stats), &g.Stats)
+	if g.Stats == nil {
+		g.Stats = []string{}
 	}
 	return &g, nil
 }
@@ -103,7 +109,22 @@ func (s *Store) AllGroups(ctx context.Context) ([]*Group, error) {
 func groupArgs(g *Group) []any {
 	return []any{g.Name, g.Sport, g.SportName, g.Scoring, g.Format, boolInt(g.LowerBetter), g.Color, g.Description,
 		g.VenueName, g.VenueAddress, nullF(g.VenueLat), nullF(g.VenueLon), g.VenueRef, boolInt(g.Outdoor), g.Weekday, g.Time, g.DurationMin, g.PlanDays,
-		g.MinPlayers, g.MaxPlayers, g.CostCents, g.Currency, g.WinPoints, g.DrawPoints, g.LossPoints, boolInt(g.EmailPlayers), boolInt(g.Archived)}
+		g.MinPlayers, g.MaxPlayers, g.CostCents, g.Currency, g.WinPoints, g.DrawPoints, g.LossPoints, boolInt(g.EmailPlayers), boolInt(g.Archived),
+		g.PayNote, boolInt(g.ChargeGames), firstOr(g.RatingScope, "all"), toJSON(nonNil(g.Stats))}
+}
+
+func firstOr(v, d string) string {
+	if v == "" {
+		return d
+	}
+	return v
+}
+
+func nonNil(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }
 
 // CreateGroup makes a group with its maker as the first organiser.
@@ -115,8 +136,8 @@ func (s *Store) CreateGroup(ctx context.Context, uid int64, g *Group) error {
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `INSERT INTO groups (user_id, name, sport, sport_name, scoring, format, lower_better, color, description,
 		venue_name, venue_address, venue_lat, venue_lon, venue_ref, outdoor, weekday, time, duration_min, plan_days,
-		min_players, max_players, cost_cents, currency, win_points, draw_points, loss_points, email_players, archived)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{uid}, groupArgs(g)...)...)
+		min_players, max_players, cost_cents, currency, win_points, draw_points, loss_points, email_players, archived, pay_note, charge_games, rating_scope, stats)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{uid}, groupArgs(g)...)...)
 	if err != nil {
 		return err
 	}
@@ -133,7 +154,7 @@ func (s *Store) UpdateGroup(ctx context.Context, g *Group) error {
 	_, err := s.DB.ExecContext(ctx, `UPDATE groups SET name = ?, sport = ?, sport_name = ?, scoring = ?, format = ?, lower_better = ?, color = ?, description = ?,
 		venue_name = ?, venue_address = ?, venue_lat = ?, venue_lon = ?, venue_ref = ?, outdoor = ?, weekday = ?, time = ?, duration_min = ?, plan_days = ?,
 		min_players = ?, max_players = ?, cost_cents = ?, currency = ?, win_points = ?, draw_points = ?, loss_points = ?, email_players = ?, archived = ?,
-		updated_at = ? WHERE id = ?`, append(groupArgs(g), Now(), g.ID)...)
+		pay_note = ?, charge_games = ?, rating_scope = ?, stats = ?, updated_at = ? WHERE id = ?`, append(groupArgs(g), Now(), g.ID)...)
 	return err
 }
 

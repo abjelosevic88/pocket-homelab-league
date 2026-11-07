@@ -38,6 +38,48 @@ type Sport struct {
 	Health      string   `json:"health"` // the kind of workout in Pocket Health
 	Draws       bool     `json:"draws"`
 	Color       string   `json:"color"`
+	Stats       []string `json:"stats"` // what is counted per player by default
+}
+
+// Stat is something counted per player in a match.
+type Stat struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Icon string `json:"icon"`
+}
+
+// Stats are the things a group can count per player.
+var Stats = []Stat{
+	{"assists", "Assists", "🅰️"}, {"yellow", "Yellow cards", "🟨"}, {"red", "Red cards", "🟥"}, {"saves", "Saves", "🧤"},
+	{"aces", "Aces", "🎯"}, {"blocks", "Blocks", "🧱"}, {"rebounds", "Rebounds", "🏀"}, {"steals", "Steals", "🖐️"},
+	{"threes", "Three-pointers", "3️⃣"}, {"double_faults", "Double faults", "❌"}, {"winners", "Winners", "⚡"},
+	{"checkouts", "Checkouts", "✅"}, {"180s", "180s", "💯"}, {"breaks", "Breaks", "🎱"}, {"strikes", "Strikes", "🎳"}, {"birdies", "Birdies", "🐦"},
+}
+
+// ValidStat reports whether a stat exists.
+func ValidStat(k string) bool {
+	for _, s := range Stats {
+		if s.Key == k {
+			return true
+		}
+	}
+	return false
+}
+
+// DefaultStats per sport.
+var defaultStats = map[string][]string{
+	"football": {"assists", "yellow", "red", "saves"}, "futsal": {"assists", "yellow", "saves"}, "handball": {"assists", "saves"}, "hockey": {"assists", "saves"},
+	"basketball": {"rebounds", "assists", "threes", "steals"}, "volleyball": {"aces", "blocks"}, "beach_volleyball": {"aces", "blocks"},
+	"tennis": {"aces", "double_faults"}, "padel": {"winners"}, "darts": {"180s", "checkouts"}, "pool": {"breaks"}, "bowling": {"strikes"}, "golf": {"birdies"},
+}
+
+func init() {
+	for i := range Sports {
+		Sports[i].Stats = defaultStats[Sports[i].Key]
+		if Sports[i].Stats == nil {
+			Sports[i].Stats = []string{}
+		}
+	}
 }
 
 var vs = []string{FormatSingles, FormatDoubles}

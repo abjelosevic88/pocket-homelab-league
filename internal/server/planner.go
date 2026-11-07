@@ -29,6 +29,7 @@ func (s *Server) plan(ctx context.Context) {
 	s.planUsualGames(ctx, now)
 	s.remind(ctx, now)
 	s.tournamentChores(ctx, now)
+	s.dropPhotos(ctx, 0)
 	if ids, err := s.store.AutoConfirm(ctx, now.Add(-48*time.Hour).UTC().Format(time.RFC3339Nano)); err == nil && len(ids) > 0 {
 		s.log.Debug("results confirmed by themselves", "count", len(ids))
 	}
