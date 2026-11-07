@@ -351,3 +351,39 @@ func TestSeasonsAndStats(t *testing.T) {
 	a.expect(404, a.bob, "POST", "/api/v1/seasons/"+id(ox)+"/close", nil)
 	a.expect(404, a.bob, "GET", p+"/table?season="+id(ox), nil)
 }
+
+func TestLiveScoring(t *testing.T) {
+	a := newApp(t, nil)
+	gid, gameID := tennis(a)
+	g := "/api/v1/groups/" + gid
+	a.ok(a.alice, "POST", g+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	a.expect(404, a.bob, "POST", "/api/v1/groups/999/live", nil)
+	l := a.ok(a.alice, "POST", g+"/live", map[string]any{"game_id": n(gameID), "a_ids": []int64{a.ids["Alice"]}, "b_ids": []int64{a.ids["Bob"]}})
+	if l["a_name"] != "Alice" || l["rules"].(map[string]any)["kind"] != "tennis" {
+		t.Fatalf("start: %v", l)
+	}
+	p := "/api/v1/live/" + id(l)
+	for i := 0; i < 3; i++ {
+		l = a.ok(a.alice, "POST", p+"/point", map[string]any{"side": "a", "at": i})
+	}
+	if pt := l["view"].(map[string]any)["point"].([]any); pt[0] != "40" || pt[1] != "0" {
+		t.Fatalf("40–0: %v", pt)
+	}
+	// Bob taps too: someone else is keeping the score
+	a.expect(409, a.bob, "POST", p+"/point", map[string]any{"side": "b"})
+	// a double tap from an old screen is refused
+	a.expect(409, a.alice, "POST", p+"/point", map[string]any{"side": "a", "at": 1})
+	l = a.ok(a.bob, "POST", p+"/point", map[string]any{"side": "b", "take": true})
+	l = a.ok(a.bob, "POST", p+"/point", map[string]any{"undo": true})
+	if num(l["view"].(map[string]any), "total") != 3 {
+		t.Fatalf("undo: %v", l["view"])
+	}
+	if ls := a.list(a.bob, g+"/live"); len(ls) != 1 {
+		t.Fatalf("list: %v", ls)
+	}
+	a.ok(a.alice, "POST", p+"/finish", nil)
+	a.expect(400, a.alice, "POST", p+"/point", map[string]any{"side": "a"})
+	// a group playing by a ranking can't
+	golf := a.ok(a.alice, "POST", "/api/v1/groups", map[string]any{"name": "Golf", "sport": "golf"})
+	a.expect(400, a.alice, "POST", "/api/v1/groups/"+id(golf)+"/live", map[string]any{})
+}

@@ -11,6 +11,8 @@ import type { AppSlug, GameDetail, Guest, Match, Person } from '../lib/types'
 import { AppOff, offTitle } from '../components/Apps'
 import { AnswerButtons, cap, MatchRow } from '../components/Bits'
 import { Chat } from '../components/Chat'
+import { LiveBoard, LiveDot, LiveScorer } from '../components/Live'
+import { liveResult, RULE_PRESETS, startLive, type LiveRules, type LiveScore } from '../lib/live'
 import { GameForm } from '../components/GameForm'
 import { Icon } from '../components/icons'
 import { openCreate, useCrumb } from '../components/Layout'
@@ -106,6 +108,8 @@ export default function Game() {
 
           {gm.status === 'planned' && g.format === 'teams' && by('in').length >= 2 && <Teams d={d} onPost={(b, ok) => post('teams', b, ok)} />}
 
+          {gm.status === 'planned' && !['ranking', 'result'].includes(g.scoring) && <LiveSection d={d} onSaved={load} />}
+
           {gm.status === 'planned' && <section className="stack">
             <div className="sec-head"><Icon name="trophy" size={16} /><h3>{d.matches.length > 1 ? 'Results' : 'Result'}</h3><span className="spacer" />
               {(ended || d.matches.length > 0 || parseStart(gm.starts_at) < Date.now()) && <button type="button" className="btn sm" onClick={() => openCreate('result', g.id, gm.id)}><Icon name="plus" size={14} />{d.matches.length ? 'Another result' : 'Enter the score'}</button>}</div>
@@ -142,6 +146,83 @@ export default function Game() {
 }
 
 function parseStart(ts: string) { return ts ? new Date(ts).getTime() : 0 }
+
+function LiveSection({ d, onSaved }: { d: GameDetail; onSaved: () => void }) {
+  const { toast } = useToast()
+  const g = d.group, gm = d.game
+  const [list, setList] = useState<LiveScore[]>([])
+  const [scoring, setScoring] = useState<LiveScore | null>(null)
+  const [pick, setPick] = useState(false)
+  const load = useCallback(() => api.get<LiveScore[]>(`${V1}/groups/${g.id}/live`).then(l => setList(l.filter(x => x.game_id === gm.id))).catch(() => {}), [g.id, gm.id])
+  useEffect(() => { load() }, [load])
+  useLiveEvents(e => {
+    if (e.type !== 'live' || e.data.group_id !== g.id) return
+    if (e.data.deleted) setList(l => l.filter(x => x.id !== e.data.id))
+    else if (e.data.game_id === gm.id) setList(l => l.some(x => x.id === e.data.id) ? l.map(x => x.id === e.data.id ? e.data : x) : [e.data, ...l])
+  })
+  const soon = parseStart(gm.starts_at) - Date.now() < 60 * 60 * 1000 && Date.now() - parseStart(gm.starts_at) < 12 * 60 * 60 * 1000
+  const running = list.filter(x => !x.finished_at)
+  if (!soon && running.length === 0) return null
+  const save = async (l: LiveScore) => {
+    try {
+      await api.post(`${V1}/groups/${g.id}/matches`, { game_id: gm.id, players: [...l.a_ids.map(id => ({ user_id: id, side: 'a' })), ...l.b_ids.map(id => ({ user_id: id, side: 'b' }))], score: liveResult(l) })
+      announceChange(); toast('Result saved — the others can confirm it'); onSaved(); return true
+    } catch (e) { toast((e as Error).message, 'err'); return false }
+  }
+  return (
+    <section className="stack">
+      <div className="sec-head"><Icon name="activity" size={16} /><h3>Live</h3>{running.length > 0 && <LiveDot />}<span className="spacer" />
+        <button type="button" className="btn sm" onClick={() => setPick(true)}><Icon name="play" size={14} />Score it live</button></div>
+      {running.length === 0 ? <p className="muted small">Tap point by point at the court; everyone sees the score move, and it goes in as the result.</p> :
+        <div className="stack tight">{running.map(l => (
+          <button key={l.id} type="button" className="live-open" onClick={() => setScoring(l)} title="Keep the score">
+            <LiveBoard a={l.a_name} b={l.b_name} view={l.view} rules={l.rules} compact />
+            <span className="muted small">{l.scorer_name ? `${l.scorer_name} keeps the score` : ''}</span>
+          </button>
+        ))}</div>}
+      {pick && <StartLive d={d} onClose={() => setPick(false)} onStarted={l => { setPick(false); setList(x => [l, ...x.filter(y => y.id !== l.id)]); setScoring(l) }} />}
+      {scoring && <LiveScorer l={scoring} onClose={() => setScoring(null)} onFinish={save} />}
+    </section>
+  )
+}
+
+function StartLive({ d, onClose, onStarted }: { d: GameDetail; onClose: () => void; onStarted: (l: LiveScore) => void }) {
+  const { toast } = useToast()
+  const g = d.group
+  const ins = d.people.filter(p => p.answer === 'in')
+  const per = g.format === 'singles' ? 1 : g.format === 'doubles' ? 2 : 0
+  const [a, setA] = useState<number[]>(per ? [] : ins.filter(p => p.side === 'a').map(p => p.user_id))
+  const [b, setB] = useState<number[]>(per ? [] : ins.filter(p => p.side === 'b').map(p => p.user_id))
+  const tennis = ['tennis', 'padel'].includes(g.sport)
+  const [preset, setPreset] = useState(g.sport === 'padel' ? '0g' : '0')
+  const opts = ins.map(p => ({ value: String(p.user_id), label: p.name }))
+  const slot = (side: 'a' | 'b', i: number) => {
+    const cur = side === 'a' ? a : b
+    const set = side === 'a' ? setA : setB
+    const taken = new Set([...a, ...b])
+    return <Select key={`${side}${i}`} ariaLabel={`Side ${side.toUpperCase()} player ${i + 1}`} value={cur[i] ? String(cur[i]) : ''} placeholder="Who?"
+      onChange={v => { const n = [...cur]; n[i] = Number(v); set(n.filter(Boolean)) }} options={opts.filter(o => !taken.has(Number(o.value)) || Number(o.value) === cur[i])} />
+  }
+  const ready = per ? a.length === per && b.length === per : a.length > 0 && b.length > 0
+  const go = async () => {
+    let rules: Partial<LiveRules> | undefined
+    if (tennis) { const p = RULE_PRESETS[Number(preset.replace('g', ''))]; rules = { ...p.rules, golden: preset.endsWith('g') } }
+    try { onStarted(await startLive(g.id, { game_id: d.game.id, a_ids: a, b_ids: b, rules })) } catch (e) { toast((e as Error).message, 'err') }
+  }
+  return (
+    <Modal title="Score it live" onClose={onClose} size="sm">
+      <div className="stack">
+        {per ? <div className="sides">
+          <div className="side-col"><h4 className="form-sec-h">Side A</h4>{Array.from({ length: per }, (_, i) => slot('a', i))}</div>
+          <div className="side-vs" aria-hidden="true">vs</div>
+          <div className="side-col"><h4 className="form-sec-h">Side B</h4>{Array.from({ length: per }, (_, i) => slot('b', i))}</div>
+        </div> : ready ? <p>Team A ({a.length}) against Team B ({b.length}) — the teams of the day.</p> : <p className="warn-text">Pick the teams first (Teams, above).</p>}
+        {tennis && <Select ariaLabel="Rules" value={preset} onChange={setPreset} options={RULE_PRESETS.flatMap((p, i) => [{ value: String(i), label: p.label }, { value: `${i}g`, label: `${p.label}, golden point` }])} />}
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="button" className="btn primary" disabled={!ready} onClick={go}><Icon name="play" size={15} />Start</button></div>
+      </div>
+    </Modal>
+  )
+}
 
 function Voting({ d, busy, onSaved }: { d: GameDetail; busy: Record<string, string[]>; onSaved: (d: GameDetail) => void }) {
   const { user } = useApp()

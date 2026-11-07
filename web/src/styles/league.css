@@ -638,3 +638,27 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .award { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
 .award.medal { background: color-mix(in srgb, #fab005 10%, var(--surface)); border-color: color-mix(in srgb, #fab005 35%, var(--border)); }
 .award-ico { font-size: 24px; line-height: 1; }
+
+/* live scoring */
+.live-board { border-radius: 12px; background: #0f1a14; color: #e9f5ec; padding: 10px 12px; display: grid; gap: 4px; font-variant-numeric: tabular-nums; }
+.live-board.compact { padding: 6px 9px; border-radius: 9px; font-size: 13px; }
+.lb-row { display: flex; align-items: center; gap: 10px; }
+.lb-name { flex: 1; min-width: 0; font-weight: 550; }
+.lb-row.won .lb-name { color: #8ce99a; }
+.lb-flag { margin-left: 8px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #ffd43b; }
+.lb-set { width: 22px; text-align: center; color: #a9c2b1; }
+.lb-set.won { color: #fff; font-weight: 700; }
+.lb-cur { width: 30px; text-align: center; font-weight: 700; color: #fff; background: rgba(255,255,255,.08); border-radius: 6px; }
+.lb-pt { width: 34px; text-align: center; font-weight: 700; color: #ffd43b; }
+.lb-note { font-size: 11px; color: #ffd43b; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #fa5252; box-shadow: 0 0 0 3px color-mix(in srgb, #fa5252 25%, transparent); flex-shrink: 0; }
+.live-taps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.live-tap-col { display: grid; gap: 6px; min-width: 0; }
+.live-tap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 120px; border-radius: 16px; border: 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px; color: #fff; touch-action: manipulation; }
+.live-tap b { font-size: 28px; }
+.live-tap.side-a { background: var(--accent); }
+.live-tap.side-b { background: #1c7ed6; }
+.live-tap:disabled { opacity: .7; }
+.live-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 650; color: var(--danger); font-variant-numeric: tabular-nums; }
+.live-open { display: grid; gap: 4px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+.tm-live { margin: 4px 0 2px; max-width: 420px; }

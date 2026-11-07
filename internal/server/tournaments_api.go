@@ -361,6 +361,7 @@ func (s *Server) tDetail(ctx context.Context, t *store.Tournament, g *store.Grou
 	if t.Format == "ladder" {
 		out["challenges"], _ = s.store.Challenges(ctx, t.ID)
 	}
+	out["live"] = s.tournamentLive(ctx, t.ID, public)
 	if !public {
 		out["log"], _ = s.store.TLogs(ctx, t.ID, 40)
 		out["share_url"] = s.cfg.BaseURL + "/t/" + t.ShareToken

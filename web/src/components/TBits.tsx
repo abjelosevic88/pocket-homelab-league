@@ -5,11 +5,15 @@ import { api, V1 } from '../lib/api'
 import { fmtDateTime } from '../lib/format'
 import { matchEntries, sideName, tScore, type TDetail, type TLeader, type TMatch, type TRow } from '../lib/tour'
 import { Icon } from './icons'
+import { LiveBoard, LiveDot, LiveScorer } from './Live'
+import { liveResult, startLive, type LiveScore } from '../lib/live'
 import { Field, Modal, Segmented, useToast } from './ui'
 
 /** One match: the sides, the score, where and its state; the buttons fit the viewer. */
 export function TMatchLine({ d, m, onResult, onChanged, compact = false, readOnly = false }: { d: TDetail; m: TMatch; onResult?: (m: TMatch) => void; onChanged?: (d: TDetail) => void; compact?: boolean; readOnly?: boolean }) {
   const { toast } = useToast()
+  const [scoring, setScoring] = useState<LiveScore | null>(null)
+  const live = d.live?.[String(m.id)]
   const mine = matchEntries(m).some(e => d.mine.includes(e))
   const court = d.courts.find(c => c.id === m.court_id)
   const canEnter = !readOnly && d.tournament.status === 'live' && (mine || d.can_run) && ['ready', 'called', 'reported'].includes(m.status) && (m.a_entry || m.sides?.a?.length) && (m.b_entry || m.sides?.b?.length)
@@ -22,6 +26,17 @@ export function TMatchLine({ d, m, onResult, onChanged, compact = false, readOnl
   }
   const a = sideName(d, m, 'a'), b = sideName(d, m, 'b')
   const score = tScore(m)
+  const stage = d.stages.find(s => s.id === m.stage_id)
+  const rotating = ['americano', 'mexicano', 'kotc'].includes(stage?.kind || '')
+  const liveOK = !['ranking', 'result'].includes(d.group.scoring) && stage?.kind !== 'ranking'
+  const scoreLive = async () => {
+    try { setScoring(await startLive(d.group.id, { tmatch_id: m.id, ...(rotating ? { rules: { kind: 'count' } } : {}) })) } catch (e) { toast((e as Error).message, 'err') }
+  }
+  const saveLive = async (l: LiveScore) => {
+    const r = liveResult(l)
+    const body = rotating ? { a_total: l.view.cur[0], b_total: l.view.cur[1] } : { score: r }
+    try { onChanged?.(await api.post<TDetail>(`${V1}/tmatches/${m.id}/result`, body)); toast(d.can_run ? 'Result saved' : 'Result saved — the other side confirms it'); return true } catch (e) { toast((e as Error).message, 'err'); return false }
+  }
   if (m.outcome === 'bye') return <div className={`tm done bye ${mine ? 'mine' : ''} ${compact ? 'compact' : ''}`}><div className="tm-main"><span className="tm-side won">{m.winner === 'b' ? b : a}</span> <span className="muted small">· bye</span></div></div>
   return (
     <div className={`tm ${m.status} ${mine ? 'mine' : ''} ${compact ? 'compact' : ''}`}>
@@ -31,7 +46,9 @@ export function TMatchLine({ d, m, onResult, onChanged, compact = false, readOnl
           <span className="tm-score tnum">{score || 'vs'}</span>
           <span className={`tm-side right ${m.winner === 'b' ? 'won' : ''}`}>{b}{m.white === 'b' && <span className="chess-w" title="White">♔</span>}</span>
         </div>
+        {live && m.status !== 'done' && <div className="tm-live"><LiveBoard a={live.a_name} b={live.b_name} view={live.view} rules={live.rules} compact /></div>}
         <div className="tm-sub muted small">
+          {live && m.status !== 'done' && <span className="live-pill"><LiveDot />live{live.scorer_name ? ` · ${live.scorer_name}` : ''}</span>}
           {m.label && !compact && <span>{m.label}</span>}
           {court && m.status === 'called' && <span className="pill st-open"><Icon name="pin" size={11} />{court.name} now</span>}
           {court && m.status !== 'called' && m.status !== 'done' && m.scheduled_at && <span>{court.name} · {fmtDateTime(m.scheduled_at, false)}</span>}
@@ -43,10 +60,12 @@ export function TMatchLine({ d, m, onResult, onChanged, compact = false, readOnl
       </div>
       {(canEnter || canConfirm) && <div className="tm-actions">
         {canConfirm && <><button type="button" className="btn sm primary" onClick={() => confirm(false)}><Icon name="check" size={13} />Right</button><button type="button" className="btn sm" onClick={() => confirm(true)}>Not right</button></>}
+        {canEnter && !canConfirm && m.status !== 'reported' && liveOK && <button type="button" className="btn sm" onClick={scoreLive} title="Point by point, for everyone to follow"><Icon name="play" size={13} />{live ? 'Keep the score' : 'Live'}</button>}
         {canEnter && !canConfirm && <button type="button" className={`btn sm ${mine ? 'primary' : ''}`} onClick={() => onResult?.(m)}>{m.status === 'reported' ? 'Change' : 'Enter the score'}</button>}
       </div>}
       {!readOnly && d.can_run && m.status === 'done' && m.outcome !== 'bye' && <button type="button" className="btn ghost icon-only sm tm-undo" title="Undo this result" aria-label="Undo this result"
         onClick={async () => { try { onChanged?.(await api.post<TDetail>(`${V1}/tmatches/${m.id}/reopen`)) } catch (e) { toast((e as Error).message, 'err') } }}><Icon name="undo" size={13} /></button>}
+      {scoring && <LiveScorer l={scoring} onClose={() => setScoring(null)} onFinish={saveLive} />}
     </div>
   )
 }

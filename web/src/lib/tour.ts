@@ -1,3 +1,4 @@
+import type { TLive } from './live'
 // Tournaments as the pages see them.
 import type { Group, Score } from './types'
 
@@ -52,6 +53,7 @@ export interface TDetail {
   tournament: Tournament; group: Group; entries: TEntry[]; stages: TStage[]; groups: TGroup[]; matches: TMatch[]; courts: TCourt[]
   names: Record<string, string>; mine: number[]; can_run: boolean; settings: TSettings; challenges?: TChallenge[]; podium: { rank: number; entry_id: number }[]
   log?: { id: number; user_id: number; action: string; detail: string; created_at: string }[]; share_url?: string; now: string; added?: number
+  live?: Record<string, TLive>
 }
 
 export const STATUS_WORDS: Record<Tournament['status'], string> = { signup: 'Sign-up open', live: 'Being played', finished: 'Finished', cancelled: 'Cancelled' }

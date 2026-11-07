@@ -25,7 +25,17 @@ export default function Tournament() {
   const [err, setErr] = useState('')
   const load = useCallback(() => api.get<TDetail>(`${V1}/tournaments/${id}`).then(x => { setD(x); setErr('') }).catch(e => setErr((e as Error).message)), [id])
   useEffect(() => { setD(null); load() }, [load])
-  useLiveEvents(e => { if (e.type === 'tournament' && e.data.id === Number(id)) load(); if (e.type === 'resync') load() })
+  useLiveEvents(e => {
+    if (e.type === 'tournament' && e.data.id === Number(id)) load()
+    if (e.type === 'resync') load()
+    if (e.type === 'live' && e.data.tmatch_id) setD(x => {
+      if (!x || !x.matches.some(m => m.id === e.data.tmatch_id)) return x
+      const live = { ...(x.live || {}) }
+      if (e.data.deleted || e.data.finished_at) delete live[String(e.data.tmatch_id)]
+      else live[String(e.data.tmatch_id)] = { id: e.data.id, line: e.data.line, view: e.data.view, rules: e.data.rules, a_name: e.data.a_name, b_name: e.data.b_name, updated_at: e.data.updated_at, scorer_name: e.data.scorer_name }
+      return { ...x, live }
+    })
+  })
   useCrumb(d?.tournament.name)
   if (err) return <Empty icon="alert" title="Not found">This tournament does not exist, or you are not in its group. <Link to="/">Home</Link></Empty>
   if (!d) return <Loading />
@@ -38,7 +48,8 @@ export function PublicTournament() {
   const [d, setD] = useState<TDetail | null>(null)
   const [err, setErr] = useState('')
   const load = useCallback(() => api.get<TDetail>(`${V1}/public/t/${token}`).then(setD).catch(e => setErr((e as Error).message)), [token])
-  useEffect(() => { load(); const t = window.setInterval(() => { if (document.visibilityState === 'visible') load() }, 20000); return () => window.clearInterval(t) }, [load])
+  const anyLive = Object.keys(d?.live || {}).length > 0
+  useEffect(() => { load(); const t = window.setInterval(() => { if (document.visibilityState === 'visible') load() }, anyLive ? 5000 : 20000); return () => window.clearInterval(t) }, [load, anyLive])
   if (err) return <div className="public-page"><Empty icon="alert" title="Not found">This link does not work (any more).</Empty></div>
   if (!d) return <div className="public-page"><Loading /></div>
   return <div className="public-page"><div className="public-brand"><img src="/favicon.svg" alt="" width={22} height={22} /> Pocket League</div><TournamentView d={d} setD={setD} reload={load} readOnly /></div>
