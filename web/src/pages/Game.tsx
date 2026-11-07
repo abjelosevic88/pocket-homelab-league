@@ -1,13 +1,13 @@
 // One game: when and where, who is in (and the teams), the weather, the
 // results, player of the game, the cost, and the comments.
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { announceChange, useAppState, useLiveEvents } from '../lib/data'
 import { fmtDateTime } from '../lib/format'
 import { ANSWER_WORDS, APP_INFO, money, relDay, when } from '../lib/league'
-import type { AppSlug, GameDetail, Match, Person } from '../lib/types'
+import type { AppSlug, GameDetail, Guest, Match, Person } from '../lib/types'
 import { AppOff, offTitle } from '../components/Apps'
 import { AnswerButtons, cap, MatchRow } from '../components/Bits'
 import { Chat } from '../components/Chat'
@@ -99,7 +99,10 @@ export default function Game() {
 
           {gm.status === 'voting' && <Voting d={d} busy={busy} onSaved={setD} />}
 
-          {gm.status === 'planned' && <Who d={d} by={by} silent={silent} org={org} onAnswer={(uid, a) => post('answer', { user_id: uid, answer: a })} />}
+          {gm.status === 'planned' && <Who d={d} by={by} silent={silent} org={org} me={me} onAnswer={(uid, a) => post('answer', { user_id: uid, answer: a })}
+            onNoShow={(uid, v) => post('no-show', { user_id: uid, no_show: v }, v ? 'Marked: didn’t come' : 'Marked: came')} onChanged={setD} />}
+
+          {gm.status === 'planned' && d.duties.length > 0 && <Duties d={d} me={me} org={d.can_edit} onChanged={setD} />}
 
           {gm.status === 'planned' && g.format === 'teams' && by('in').length >= 2 && <Teams d={d} onPost={(b, ok) => post('teams', b, ok)} />}
 
@@ -161,6 +164,7 @@ function Voting({ d, busy, onSaved }: { d: GameDetail; busy: Record<string, stri
               {o.venue_name && <div className="small opt-venue"><Icon name="pin" size={11} /> {o.venue_name}{o.venue_address ? `, ${o.venue_address}` : ''}</div>}
               <div className="muted small ellipsis">{yes.length} yes{yes.length ? ` (${yes.map(n => n.split(' ')[0]).join(', ')})` : ''}{maybe.length ? ` · ${maybe.length} maybe` : ''}</div>
               {busy[o.starts_at]?.length > 0 && <div className="small warn-text"><Icon name="calendar" size={11} /> You have: {busy[o.starts_at].join('; ')}</div>}
+              {(d.away[o.starts_at.slice(0, 10)] || []).length > 0 && <div className="small muted"><Icon name="plane" size={11} /> Away: {(d.away[o.starts_at.slice(0, 10)] || []).map(u => (names[String(u)] || '?').split(' ')[0]).join(', ')}</div>}
             </div>
             <Segmented size="sm" value={o.votes[me] || null} onChange={v => vote(o.id, o.votes[me] === v ? '' : v)} options={[{ value: 'yes', label: 'Yes' }, { value: 'maybe', label: 'Maybe' }, { value: 'no', label: 'No' }]} />
             {d.can_edit && <button type="button" className="btn sm" onClick={() => pick(o.id)} title="Plan the game at this time">Pick</button>}
@@ -171,34 +175,115 @@ function Voting({ d, busy, onSaved }: { d: GameDetail; busy: Record<string, stri
   )
 }
 
-function Who({ d, by, silent, org, onAnswer }: { d: GameDetail; by: (a: string) => Person[]; silent: Person[]; org: boolean; onAnswer: (uid: number, a: string) => void }) {
+function Who({ d, by, silent, org, me, onAnswer, onNoShow, onChanged }: { d: GameDetail; by: (a: string) => Person[]; silent: Person[]; org: boolean; me: number; onAnswer: (uid: number, a: string) => void; onNoShow: (uid: number, v: boolean) => void; onChanged: (d: GameDetail) => void }) {
+  const { toast } = useToast()
   const gm = d.game
+  const [guest, setGuest] = useState<string | null>(null)
+  const [sub, setSub] = useState(false)
   const short = gm.min_players - gm.in
-  const col = (title: string, list: Person[], cls: string) => list.length > 0 && (
+  const started = parseStart(gm.starts_at) < Date.now()
+  const full = gm.max_players > 0 && gm.in >= gm.max_players
+  const removeGuest = async (x: Guest) => { try { onChanged(await api.del<GameDetail>(`${V1}/games/${gm.id}/guests/${x.id}`)); announceChange() } catch (e) { toast((e as Error).message, 'err') } }
+  const guests = (a: 'in' | 'waiting') => d.guests.filter(x => x.answer === a).map(x => (
+    <div key={`g${x.id}`} className="who guest">
+      <Avatar name={x.name} size={26} />
+      <span className="grow min0"><span className="ellipsis block-line">{x.name}</span><span className="muted small ellipsis block-line">guest of {x.added_by_name?.split(' ')[0] || 'someone'}</span></span>
+      {(x.added_by === me || d.can_edit) && !started && <button type="button" className="btn ghost icon-only sm" aria-label={`Take ${x.name} off`} title="Take off" onClick={() => removeGuest(x)}><Icon name="x" size={14} /></button>}
+    </div>
+  ))
+  const col = (title: string, list: Person[], cls: string, extra: React.ReactNode[] = []) => (list.length > 0 || extra.length > 0) && (
     <div className={`who-col ${cls}`}>
-      <h4 className="form-sec-h">{title} <span className="count">{list.length}</span></h4>
+      <h4 className="form-sec-h">{title} <span className="count">{list.length + extra.length}</span></h4>
       {list.map(p => (
-        <div key={p.user_id} className="who">
+        <div key={p.user_id} className={`who ${p.no_show ? 'no-show' : ''}`}>
           <Avatar name={p.name} size={26} />
-          <span className="grow min0"><span className="ellipsis block-line">{p.name}</span>{p.note && <span className="muted small ellipsis block-line">{p.note}</span>}</span>
-          {org && <MenuButton label={`Answer for ${p.name}`} className="btn ghost icon-only sm" align="right" width={200}
-            items={[{ heading: `Answer for ${p.name.split(' ')[0]}` }, ...(['in', 'maybe', 'out'] as const).map(a => ({ label: ANSWER_WORDS[a], checked: p.answer === a, onSelect: () => onAnswer(p.user_id, a) }))]}>
+          <span className="grow min0"><span className="ellipsis block-line">{p.name}</span>{(p.note || p.no_show) && <span className="muted small ellipsis block-line">{p.no_show ? 'didn’t come' : p.note}</span>}</span>
+          {org && <MenuButton label={`Answer for ${p.name}`} className="btn ghost icon-only sm" align="right" width={210}
+            items={[{ heading: `Answer for ${p.name.split(' ')[0]}` }, ...(['in', 'maybe', 'out'] as const).map(a => ({ label: ANSWER_WORDS[a], checked: p.answer === a, onSelect: () => onAnswer(p.user_id, a) })),
+              ...(started && p.answer === 'in' ? ['sep' as const, { label: p.no_show ? 'Came after all' : 'Didn’t come', icon: p.no_show ? 'check' : 'user-x', onSelect: () => onNoShow(p.user_id, !p.no_show) }] : [])]}>
             <Icon name="more" size={14} /></MenuButton>}
         </div>
       ))}
+      {extra}
     </div>
   )
   return (
     <section className="stack">
       <div className="sec-head"><Icon name="users" size={16} /><h3>Who's coming</h3>
-        <span className={`fill fill-${short > 0 ? 'warn' : gm.max_players && gm.in >= gm.max_players ? 'full' : 'ok'}`}>{gm.in} in{gm.max_players ? ` of ${gm.max_players}` : ''}{short > 0 ? ` · ${short} short` : ''}</span></div>
+        <span className={`fill fill-${short > 0 ? 'warn' : full ? 'full' : 'ok'}`}>{gm.in} in{gm.max_players ? ` of ${gm.max_players}` : ''}{short > 0 ? ` · ${short} short` : ''}</span>
+        <span className="spacer" />
+        {!started && !full && <button type="button" className="btn sm" onClick={() => setSub(true)}><Icon name="search" size={14} />Find a sub</button>}
+        {!started && <button type="button" className="btn sm" onClick={() => setGuest('')}><Icon name="user-plus" size={14} />Bring a guest</button>}
+      </div>
+      {d.subs.asked > 0 && <p className="muted small">Asked {d.subs.asked} {d.subs.asked === 1 ? 'person' : 'people'} to fill in{d.subs.taken ? ` · ${d.subs.taken} answered` : ''}.</p>}
       <div className="who-grid">
-        {col('In', by('in'), 'in')}
-        {col('Waiting list', by('waiting'), 'waiting')}
+        {col('In', by('in'), 'in', guests('in'))}
+        {col('Waiting list', by('waiting'), 'waiting', guests('waiting'))}
         {col('Maybe', by('maybe'), 'maybe')}
         {col('Out', by('out'), 'out')}
         {col('No answer yet', silent, 'silent')}
       </div>
+      {guest !== null && <Modal title="Bring a guest" onClose={() => setGuest(null)} size="sm">
+        <form className="stack" onSubmit={async e => { e.preventDefault(); try { onChanged(await api.post<GameDetail>(`${V1}/games/${gm.id}/guests`, { name: guest })); announceChange(); setGuest(null) } catch (err) { toast((err as Error).message, 'err') } }}>
+          <input autoFocus value={guest} onChange={e => setGuest(e.target.value)} placeholder="Their name" maxLength={60} />
+          <p className="muted small">A friend for this game only — they take a place like everyone else{full ? ', and wait until one comes free' : ''}. You can bring up to 3.</p>
+          <div className="form-actions"><button type="button" className="btn" onClick={() => setGuest(null)}>Cancel</button><button className="btn primary" disabled={!guest.trim()}>Add</button></div>
+        </form>
+      </Modal>}
+      {sub && <FindSub d={d} onClose={() => setSub(false)} onDone={() => { setSub(false); onChanged({ ...d, subs: { ...d.subs } }) }} />}
+    </section>
+  )
+}
+
+function FindSub({ d, onClose, onDone }: { d: GameDetail; onClose: () => void; onDone: () => void }) {
+  const { toast } = useToast()
+  const [others, setOthers] = useState(false)
+  const [n, setN] = useState<{ maybe: number; silent: number; others: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { api.post<{ maybe: number; silent: number; others: number }>(`${V1}/games/${d.game.id}/sub`, { others: true, dry_run: true }).then(setN).catch(() => setN({ maybe: 0, silent: 0, others: 0 })) }, [d.game.id])
+  const total = n ? n.maybe + n.silent + (others ? n.others : 0) : 0
+  const go = async () => {
+    setBusy(true)
+    try { const r = await api.post<{ asked: number }>(`${V1}/games/${d.game.id}/sub`, { others }); toast(r.asked ? `Asked ${r.asked} — the first to say yes plays` : 'Everyone was asked already'); onDone() } catch (e) { toast((e as Error).message, 'err') } finally { setBusy(false) }
+  }
+  return (
+    <Modal title="Find a sub" onClose={onClose} size="sm">
+      <div className="stack">
+        <p>League asks the people who could still play, and the first to say yes is in.</p>
+        {n ? <ul className="plain-list small">
+          <li><b>{n.maybe}</b> said maybe</li>
+          <li><b>{n.silent}</b> haven't answered</li>
+        </ul> : <p className="muted small">Counting…</p>}
+        <label className="check-row"><input type="checkbox" checked={others} onChange={e => setOthers(e.target.checked)} disabled={!n?.others} />
+          <span>Also ask people from my other {d.group.sport_label} groups{n ? ` (${n.others})` : ''}<span className="muted small block-line">Whoever takes it joins this group as a player.</span></span></label>
+        <p className="muted small">Away people aren't asked. Those who already were aren't asked again.</p>
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="button" className="btn primary" onClick={go} disabled={busy || !n || total === 0}>Ask {total || ''}</button></div>
+      </div>
+    </Modal>
+  )
+}
+
+function Duties({ d, me, org, onChanged }: { d: GameDetail; me: number; org: boolean; onChanged: (d: GameDetail) => void }) {
+  const { toast } = useToast()
+  const ins = d.people.filter(p => p.answer === 'in')
+  const name = (id: number) => d.people.find(p => p.user_id === id)?.name || ''
+  const set = async (duty: number, body: Record<string, unknown>) => { try { onChanged(await api.post<GameDetail>(`${V1}/games/${d.game.id}/duties/${duty}`, body)) } catch (e) { toast((e as Error).message, 'err') } }
+  return (
+    <section className="stack">
+      <div className="sec-head"><Icon name="check-square" size={16} /><h3>Chores</h3><span className="muted small">handed out the day before, taking turns</span></div>
+      <div className="card flush">{d.duties.map(x => {
+        const mine = x.user_id === me
+        const can = mine || org || !x.user_id
+        return (
+          <div key={x.duty_id} className="duty-row">
+            {x.user_id ? <input type="checkbox" checked={x.done} disabled={!mine && !org} onChange={e => set(x.duty_id, { done: e.target.checked })} aria-label={`${x.name} done`} /> : <span className="duty-dot" />}
+            <span className="grow min0"><span className={`block-line ${x.done ? 'done' : ''}`}>{x.name}</span><span className="muted small block-line">{x.user_id ? (mine ? 'You' : name(x.user_id)) : 'Nobody yet'}</span></span>
+            {can && <Select ariaLabel={`Who does ${x.name}`} className="duty-sel" value={x.user_id ? String(x.user_id) : ''} placeholder={mine ? 'Hand it over' : 'Give it to'}
+              onChange={v => set(x.duty_id, { user_id: Number(v) || 0 })} clearLabel={org ? 'Nobody' : undefined}
+              options={ins.filter(p => org || p.user_id !== me || !x.user_id).map(p => ({ value: String(p.user_id), label: p.user_id === me ? 'Me' : p.name }))} />}
+          </div>
+        )
+      })}</div>
     </section>
   )
 }

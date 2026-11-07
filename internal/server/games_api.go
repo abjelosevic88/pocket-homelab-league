@@ -133,6 +133,8 @@ type person struct {
 	Note   string `json:"note"`
 	At     string `json:"answered_at"`
 	Rating int    `json:"rating"`
+	NoShow bool   `json:"no_show,omitempty"`
+	Away   string `json:"away,omitempty"`
 }
 
 // handleGetGame is everything about one game.
@@ -158,7 +160,7 @@ func (s *Server) gameDetail(ctx context.Context, gm *store.Game, g *store.Group)
 	answered := map[int64]bool{}
 	for _, a := range answers {
 		answered[a.UserID] = true
-		people = append(people, person{UserID: a.UserID, Name: firstNonEmpty(names[a.UserID], "Former player"), Answer: a.Answer, Side: a.Side, Note: a.Note, At: a.AnsweredAt, Rating: int(ratings[a.UserID])})
+		people = append(people, person{UserID: a.UserID, Name: firstNonEmpty(names[a.UserID], "Former player"), Answer: a.Answer, Side: a.Side, Note: a.Note, At: a.AnsweredAt, Rating: int(ratings[a.UserID]), NoShow: a.NoShow})
 	}
 	for _, m := range ms {
 		if !answered[m.UserID] {
@@ -185,6 +187,16 @@ func (s *Server) gameDetail(ctx context.Context, gm *store.Game, g *store.Group)
 		"can_edit": canEditGame(gm, g, uid), "made": made, "share_cost": shareCost(gm),
 	}
 	out["venues"], _ = s.store.Venues(ctx, g.ID)
+	guests, _ := s.store.Guests(ctx, gm.ID)
+	gv := make([]map[string]any, 0, len(guests))
+	for _, x := range guests {
+		gv = append(gv, map[string]any{"id": x.ID, "name": x.Name, "answer": x.Answer, "added_by": x.AddedBy, "added_by_name": names[x.AddedBy]})
+	}
+	out["guests"] = gv
+	out["duties"], _ = s.store.GameDuties(ctx, g.ID, gm.ID)
+	out["away"] = s.awayForGame(ctx, g, gm, opts)
+	asked, taken := s.store.SubOffersFor(ctx, gm.ID)
+	out["subs"] = map[string]int{"asked": asked, "taken": taken}
 	return out
 }
 
@@ -478,7 +490,18 @@ func (s *Server) announceGame(ctx context.Context, g *store.Group, gm *store.Gam
 	if what == "cancelled" {
 		n.button = "Open the group"
 	}
-	s.tellGroup(ctx, g, byID, n)
+	away := map[int64]bool{}
+	if what == "planned" || what == "moved" {
+		away = s.markAway(ctx, g, gm)
+	}
+	ids, _ := s.store.MemberIDs(ctx, g.ID)
+	tellIDs := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if !away[id] {
+			tellIDs = append(tellIDs, id)
+		}
+	}
+	s.tell(ctx, g, tellIDs, byID, n)
 	s.publishGroup(ctx, g, topic, fmt.Sprintf("game:%d:%s", gm.ID, what), map[string]any{"game_id": gm.ID, "group_id": g.ID, "group": g.Name,
 		"sport": g.Sport, "starts_at": gm.StartsAt, "venue": where, "status": gm.Status, "url": s.gameLink(gm.ID)})
 }
@@ -681,6 +704,7 @@ func (s *Server) answer(ctx context.Context, g *store.Group, gm *store.Game, uid
 	if before == store.AnswerIn && answer != store.AnswerIn {
 		s.moveUp(ctx, g, gm.ID)
 	}
+	s.afterAnswer(ctx, g, gm, uid, before, answer)
 	s.toGroup(ctx, g.ID, "answer", map[string]any{"game_id": gm.ID, "group_id": g.ID, "user_id": uid, "answer": answer})
 	if before != answer {
 		s.publishFor(ctx, uid, "league.answered", fmt.Sprintf("answer:%d:%d:%s", gm.ID, uid, answer), map[string]any{"game_id": gm.ID, "group": g.Name,
@@ -709,8 +733,10 @@ func (s *Server) moveUp(ctx context.Context, g *store.Group, gameID int64) {
 		s.tell(ctx, g, []int64{a.UserID}, 0, note{kind: "plans", title: "You're in: " + g.Name + ", " + whenText(gm.StartsAt),
 			body: "A place came free and you were first on the waiting list. Can't make it any more? Say so, and the next one moves up.", link: s.gameLink(gameID)})
 		s.syncCalendarLater(gameID, false)
+		s.afterAnswer(ctx, g, gm, a.UserID, store.AnswerWaiting, store.AnswerIn)
 		return
 	}
+	s.moveUpGuest(ctx, g, gm)
 }
 
 // nameIn is how someone is called in a group.

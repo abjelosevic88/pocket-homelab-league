@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { announceChange, useAppState, useData } from '../lib/data'
-import { CURRENCIES, FORMAT_WORDS, SCORING_WORDS, WEEKDAYS } from '../lib/league'
-import type { Format, Group, Scoring, Sport, Venue } from '../lib/types'
+import { CURRENCIES, FORMAT_WORDS, SCORING_WORDS, STATS, WEEKDAYS } from '../lib/league'
+import type { Duty, Format, Group, Scoring, Sport, Venue } from '../lib/types'
 import { offTitle } from './Apps'
 import { Icon } from './icons'
 import { Select } from './Select'
@@ -16,18 +16,20 @@ type Form = {
   venue_name: string; venue_address: string; venue_lat: number | null; venue_lon: number | null; venue_ref: string; outdoor: boolean
   weekday: number; time: string; duration_min: number; plan_days: number; min_players: number; max_players: number
   cost: string; currency: string; win_points: number; draw_points: number; loss_points: number; email_players: boolean
+  pay_note: string; charge_games: boolean; rating_scope: 'all' | 'season'; stats: string[]
 }
 
 function fromGroup(g: Group): Form {
   return { name: g.name, sport: g.sport, sport_name: g.sport_name, scoring: g.scoring, format: g.format, lower_better: g.lower_better, description: g.description,
     venue_name: g.venue_name, venue_address: g.venue_address, venue_lat: g.venue_lat, venue_lon: g.venue_lon, venue_ref: g.venue_ref, outdoor: g.outdoor,
     weekday: g.weekday, time: g.time, duration_min: g.duration_min, plan_days: g.plan_days, min_players: g.min_players, max_players: g.max_players,
-    cost: g.cost_cents ? String(g.cost_cents / 100) : '', currency: g.currency, win_points: g.win_points, draw_points: g.draw_points, loss_points: g.loss_points, email_players: g.email_players }
+    cost: g.cost_cents ? String(g.cost_cents / 100) : '', currency: g.currency, win_points: g.win_points, draw_points: g.draw_points, loss_points: g.loss_points, email_players: g.email_players,
+    pay_note: g.pay_note || '', charge_games: !!g.charge_games, rating_scope: g.rating_scope || 'all', stats: g.stats || [] }
 }
 
 function withSport(f: Form, s: Sport): Form {
   return { ...f, sport: s.key, scoring: s.scoring, format: s.format, lower_better: s.lower_better, outdoor: s.outdoor, min_players: s.min_players, max_players: s.max_players,
-    duration_min: s.minutes, win_points: s.draws ? 3 : 1, draw_points: s.draws ? 1 : 0, loss_points: 0 }
+    duration_min: s.minutes, win_points: s.draws ? 3 : 1, draw_points: s.draws ? 1 : 0, loss_points: 0, stats: s.stats || [] }
 }
 
 export function GroupForm({ group, onClose, onSaved }: { group?: Group; onClose: () => void; onSaved: (g: Group) => void }) {
@@ -42,7 +44,8 @@ export function GroupForm({ group, onClose, onSaved }: { group?: Group; onClose:
     if (!f && sports.length) {
       const blank: Form = { name: '', sport: '', sport_name: '', scoring: 'sets', format: 'singles', lower_better: false, description: '', venue_name: '', venue_address: '',
         venue_lat: null, venue_lon: null, venue_ref: '', outdoor: false, weekday: 0, time: '19:00', duration_min: 90, plan_days: 0, min_players: 2, max_players: 0,
-        cost: '', currency: settings?.currency || 'EUR', win_points: 3, draw_points: 1, loss_points: 0, email_players: true }
+        cost: '', currency: settings?.currency || 'EUR', win_points: 3, draw_points: 1, loss_points: 0, email_players: true,
+        pay_note: '', charge_games: false, rating_scope: 'all', stats: [] }
       setF(blank)
     }
   }, [sports, f, settings?.currency])
@@ -133,15 +136,28 @@ export function GroupForm({ group, onClose, onSaved }: { group?: Group; onClose:
                 <Select ariaLabel="Currency" value={f.currency} onChange={v => set({ currency: v })} options={Array.from(new Set([f.currency, ...CURRENCIES])).map(c => ({ value: c, label: c === 'BAM' ? 'KM' : c }))} /></div>
             </Field>
           </div>
+          <label className="check-row"><Switch checked={f.charge_games} onChange={v => set({ charge_games: v })} label="Keep accounts" disabled={!f.cost} />
+            <span>Keep accounts: after each game everyone who was in owes their share (guests go to whoever brought them). See it under Money.</span></label>
+          {(f.charge_games || f.pay_note) && <Field label="How to pay" help="Shown to everyone under Money: an IBAN, a Revolut or PayPal link, “cash to Marko”."><input value={f.pay_note} onChange={e => set({ pay_note: e.target.value })} maxLength={300} placeholder="IBAN BA39 … / revolut.me/marko" /></Field>}
         </div>
 
-        <button type="button" className="linkish self-start" onClick={() => setMore(m => !m)} aria-expanded={more}><Icon name={more ? 'chevron-up' : 'chevron-down'} size={14} /> {more ? 'Less' : 'More: the table, emails, a description'}</button>
+        <button type="button" className="linkish self-start" onClick={() => setMore(m => !m)} aria-expanded={more}><Icon name={more ? 'chevron-up' : 'chevron-down'} size={14} /> {more ? 'Less' : 'More: the table, stats, chores, emails, a description'}</button>
         {more && <div className="form-sec">
           {f.scoring !== 'ranking' && <div className="three-col tight">
             <Field label="Points for a win"><input type="number" min={0} max={10} value={f.win_points} onChange={e => set({ win_points: Number(e.target.value) || 0 })} /></Field>
             <Field label="For a draw"><input type="number" min={0} max={10} value={f.draw_points} onChange={e => set({ draw_points: Number(e.target.value) || 0 })} /></Field>
             <Field label="For a loss"><input type="number" min={0} max={10} value={f.loss_points} onChange={e => set({ loss_points: Number(e.target.value) || 0 })} /></Field>
           </div>}
+          <Field label="Ratings" group help="With seasons (the Table tab), ratings can start again at 1000 each season.">
+            <Segmented value={f.rating_scope} onChange={v => set({ rating_scope: v })} options={[{ value: 'all', label: 'Over all time' }, { value: 'season', label: 'Fresh each season' }]} size="sm" />
+          </Field>
+          <Field label="Count per player" group help="Entered with each result, added up in the table and on each player's page.">
+            <div className="chip-pick">{STATS.map(st => {
+              const on = f.stats.includes(st.key)
+              return <button key={st.key} type="button" className={`chip-btn ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => set({ stats: on ? f.stats.filter(x => x !== st.key) : [...f.stats, st.key] })}>{st.icon} {st.name}</button>
+            })}</div>
+          </Field>
+          {group && <GroupDuties group={group} />}
           <label className="check-row"><Switch checked={f.email_players} onChange={v => set({ email_players: v })} label="Email players" /> <span>Email the players who have no notifications set up: new games, reminders, "we're short". Each player can turn it off.</span></label>
           <Field label="About the group"><textarea rows={3} value={f.description} onChange={e => set({ description: e.target.value })} placeholder="House rules, who brings what…" maxLength={2000} /></Field>
         </div>}
@@ -156,6 +172,35 @@ export function GroupForm({ group, onClose, onSaved }: { group?: Group; onClose:
       </form>
       {del && group && <Confirm title={`Delete ${group.name}?`} confirmLabel="Delete for everyone" message="The games, results, table and chat go for everyone in it. Archive it instead to keep the results." onCancel={() => setDel(false)} onConfirm={remove} />}
     </Modal>
+  )
+}
+
+/** Chores people take turns doing for each game. */
+function GroupDuties({ group }: { group: Group }) {
+  const { toast } = useToast()
+  const [list, setList] = useState<string[] | null>(null)
+  const [add, setAdd] = useState('')
+  useEffect(() => { api.get<Duty[]>(`${V1}/groups/${group.id}/duties`).then(l => setList(l.map(d => d.name))).catch(() => setList([])) }, [group.id])
+  const save = async (names: string[]) => { try { setList((await api.put<Duty[]>(`${V1}/groups/${group.id}/duties`, { names })).map(d => d.name)) } catch (e) { toast((e as Error).message, 'err') } }
+  if (!list) return null
+  const ideas = ['Bring the balls', 'Book the court', 'Bring the bibs', 'Collect the money', 'Bring water'].filter(x => !list.includes(x))
+  return (
+    <div className="stack tight venues-edit">
+      <h4 className="form-sec-h">Chores</h4>
+      <p className="muted small">The day before each game, every chore goes to someone who is in — whoever did it least. They can hand it on.</p>
+      {list.map(n => (
+        <div key={n} className="venue-row">
+          <Icon name="check-square" size={14} /><span className="grow min0 ellipsis">{n}</span>
+          <button type="button" className="btn ghost icon-only sm" aria-label={`Remove ${n}`} onClick={() => save(list.filter(x => x !== n))}><Icon name="x" size={14} /></button>
+        </div>
+      ))}
+      <div className="row tight">
+        <input value={add} onChange={e => setAdd(e.target.value)} placeholder="Bring the balls" aria-label="A new chore" maxLength={60}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (add.trim()) { save([...list, add.trim()]); setAdd('') } } }} />
+        <button type="button" className="btn sm" disabled={!add.trim() || list.length >= 10} onClick={() => { save([...list, add.trim()]); setAdd('') }}>Add</button>
+      </div>
+      {ideas.length > 0 && list.length < 10 && <div className="chip-pick">{ideas.slice(0, 4).map(x => <button key={x} type="button" className="chip-btn" onClick={() => save([...list, x])}><Icon name="plus" size={12} />{x}</button>)}</div>}
+    </div>
   )
 }
 

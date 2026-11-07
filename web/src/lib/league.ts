@@ -98,3 +98,12 @@ export function sideName(names: Record<string, string>, ids: number[], format: F
 }
 
 export const REACTIONS = ['👍', '🔥', '😂', '👏', '💪', '😮']
+
+/** What a group can count per player in a match (mirrors internal/league Stats). */
+export const STATS: { key: string; name: string; icon: string }[] = [
+  { key: 'assists', name: 'Assists', icon: '🅰️' }, { key: 'yellow', name: 'Yellow cards', icon: '🟨' }, { key: 'red', name: 'Red cards', icon: '🟥' }, { key: 'saves', name: 'Saves', icon: '🧤' },
+  { key: 'aces', name: 'Aces', icon: '🎯' }, { key: 'blocks', name: 'Blocks', icon: '🧱' }, { key: 'rebounds', name: 'Rebounds', icon: '🏀' }, { key: 'steals', name: 'Steals', icon: '🖐️' },
+  { key: 'threes', name: 'Three-pointers', icon: '3️⃣' }, { key: 'double_faults', name: 'Double faults', icon: '❌' }, { key: 'winners', name: 'Winners', icon: '⚡' },
+  { key: 'checkouts', name: 'Checkouts', icon: '✅' }, { key: '180s', name: '180s', icon: '💯' }, { key: 'breaks', name: 'Breaks', icon: '🎱' }, { key: 'strikes', name: 'Strikes', icon: '🎳' }, { key: 'birdies', name: 'Birdies', icon: '🐦' },
+]
+export const statInfo = (k: string) => STATS.find(s => s.key === k) || { key: k, name: k, icon: '•' }

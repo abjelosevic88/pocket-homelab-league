@@ -11,13 +11,15 @@ import { Select } from '../components/Select'
 import { ShortcutsSheet } from '../components/ShortcutsSheet'
 import { PocketModelSelect } from '../components/PocketModelSelect'
 import { PushRow } from '../components/PushCard'
+import { AwayDays } from '../components/Away'
 import { APP_INFO, CURRENCIES, STATE_WORDS } from '../lib/league'
 
-type TabId = 'general' | 'notifications' | 'apps' | 'email' | 'ai' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
+type TabId = 'general' | 'notifications' | 'away' | 'apps' | 'email' | 'ai' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
 
 const TABS: { id: TabId; label: string; icon: string; sub: string; players: boolean }[] = [
   { id: 'general', label: 'General', icon: 'home', sub: 'Dates, times, your currency and the app title.', players: true },
   { id: 'notifications', label: 'Notifications', icon: 'bell', sub: 'New games, reminders before you play, results to check, the chat — and where they reach you.', players: true },
+  { id: 'away', label: 'Away', icon: 'plane', sub: 'Days you can’t play — holidays, an injury. You’re out for those games and nobody asks.', players: true },
   { id: 'apps', label: 'Connected apps', icon: 'link', sub: 'Your calendar, health, habits, money, Split groups, weather, places, contacts, mail and tasks — what League does in them for you.', players: false },
   { id: 'email', label: 'Email', icon: 'mail', sub: 'How sign-in links, plans and reminders reach your players: from your mailbox, your mail server, or not at all.', players: false },
   { id: 'ai', label: 'AI', icon: 'sparkles', sub: 'Who helps you: Pocket AI through Core, or your own OpenAI key.', players: false },
@@ -68,6 +70,7 @@ export default function Settings() {
             <div className="set-title"><h2>{current.label}</h2><p>{current.sub}</p></div>
             {tab === 'general' && <General />}
             {tab === 'notifications' && <Notifications />}
+            {tab === 'away' && <AwayDays />}
             {tab === 'apps' && <Integrations />}
             {tab === 'email' && <EmailTab />}
             {tab === 'ai' && <AITab />}

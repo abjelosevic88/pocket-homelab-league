@@ -160,7 +160,25 @@ func (s *Server) remind(ctx context.Context, now time.Time) {
 			if wx := s.weatherLine(ctx, g, gm); wx != "" {
 				body += "\n" + wx
 			}
-			s.tell(ctx, g, who, 0, note{kind: "reminders", title: g.Name + " " + dayWord(start, now) + " at " + start.Format("15:04"), body: body, link: link})
+			if duties, _ := s.store.GameDuties(ctx, g.ID, gm.ID); len(duties) > 0 {
+				s.assignDuties(ctx, g, gm, false)
+				duties, _ = s.store.GameDuties(ctx, g.ID, gm.ID)
+				mine := map[int64][]string{}
+				for _, d := range duties {
+					if d.UserID != 0 {
+						mine[d.UserID] = append(mine[d.UserID], d.Name)
+					}
+				}
+				for _, uid := range who {
+					b := body
+					if len(mine[uid]) > 0 {
+						b += "\nYour turn: " + strings.Join(mine[uid], ", ") + "."
+					}
+					s.tell(ctx, g, []int64{uid}, 0, note{kind: "reminders", title: g.Name + " " + dayWord(start, now) + " at " + start.Format("15:04"), body: b, link: link})
+				}
+			} else {
+				s.tell(ctx, g, who, 0, note{kind: "reminders", title: g.Name + " " + dayWord(start, now) + " at " + start.Format("15:04"), body: body, link: link})
+			}
 			s.publishGroup(ctx, g, "league.reminder", fmt.Sprintf("reminder:%d", gm.ID), map[string]any{"game_id": gm.ID, "group": g.Name, "starts_at": gm.StartsAt, "url": link})
 		}
 		// a few hours before, each at their own time

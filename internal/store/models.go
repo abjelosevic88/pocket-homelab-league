@@ -168,6 +168,7 @@ type Game struct {
 	MyAnswer string `json:"my_answer"`
 	Matches  int    `json:"matches"`
 	Comments int    `json:"comments"`
+	Guests   int    `json:"guests"`
 }
 
 // Answer is one person's "are you coming?".
@@ -178,6 +179,7 @@ type Answer struct {
 	Side       string `json:"side"`
 	Note       string `json:"note"`
 	AnsweredAt string `json:"answered_at"`
+	NoShow     bool   `json:"no_show"`
 }
 
 // Option is a time offered while finding one.

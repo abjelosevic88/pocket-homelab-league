@@ -26,7 +26,7 @@ export type Format = 'singles' | 'doubles' | 'teams' | 'everyone'
 
 export interface Sport {
   key: string; name: string; emoji: string; scoring: Scoring; format: Format; formats: Format[]; min_players: number; max_players: number
-  outdoor: boolean; lower_better: boolean; minutes: number; unit: string; health: string; draws: boolean; color: string
+  outdoor: boolean; lower_better: boolean; minutes: number; unit: string; health: string; draws: boolean; color: string; stats: string[]
 }
 
 export interface Group {
@@ -34,6 +34,7 @@ export interface Group {
   venue_name: string; venue_address: string; venue_lat: number | null; venue_lon: number | null; venue_ref: string; outdoor: boolean
   weekday: number; time: string; duration_min: number; plan_days: number; min_players: number; max_players: number
   cost_cents: number; currency: string; win_points: number; draw_points: number; loss_points: number; email_players: boolean; archived: boolean
+  pay_note: string; charge_games: boolean; rating_scope: 'all' | 'season'; stats: string[]
   created_at: string; updated_at: string
   my_role: 'organiser' | 'player'; my_notify: 'all' | 'games' | 'off'; last_read_id: number; unread: number; members: number; last_message_id: number; last_message_at: string
   sport_info: Sport; sport_label: string; next_game?: Game
@@ -46,7 +47,7 @@ export interface Game {
   id: number; group_id: number; user_id: number; status: GameStatus; starts_at: string; duration_min: number; title: string; notes: string
   venue_name: string; venue_address: string; venue_lat: number | null; venue_lon: number | null; min_players: number; max_players: number
   cost_cents: number; currency: string; vote_until: string; cancel_reason: string; auto: boolean; created_at: string; updated_at: string
-  in: number; maybe: number; out: number; waiting: number; my_answer: AnswerKind; matches: number; comments: number
+  in: number; maybe: number; out: number; waiting: number; my_answer: AnswerKind; matches: number; comments: number; guests: number
   group_name?: string; group_color?: string; emoji?: string; sport?: string; ended?: boolean
 }
 
@@ -55,7 +56,7 @@ export interface Member {
   email?: string; phone?: string; joined: boolean; joined_at: string; last_seen_at?: string | null; can_link: boolean; link_sent_at?: string; online: boolean
 }
 
-export interface Person { user_id: number; name: string; answer: AnswerKind; side: '' | 'a' | 'b'; note: string; answered_at: string; rating: number }
+export interface Person { user_id: number; name: string; answer: AnswerKind; side: '' | 'a' | 'b'; note: string; answered_at: string; rating: number; no_show?: boolean }
 export interface Option { id: number; game_id: number; starts_at: string; venue_name: string; venue_address: string; venue_lat: number | null; venue_lon: number | null; votes: Record<string, 'yes' | 'maybe' | 'no'> }
 export interface Venue { id: number; group_id: number; name: string; address: string; lat: number | null; lon: number | null; ref: string }
 
@@ -72,7 +73,15 @@ export interface Made { id: number; group_id: number; game_id: number; match_id:
 export interface GameDetail {
   game: Game; group: Group; people: Person[]; options: Option[]; matches: Match[]; venues: Venue[]
   mvp: { mine: number; tally: Record<string, number>; open: boolean }; can_edit: boolean; made: Made[]; share_cost: number; result?: string; rating_gap?: number
+  guests: Guest[]; duties: GameDuty[]; away: Record<string, number[]>; subs: { asked: number; taken: number }
 }
+
+export interface Guest { id: number; name: string; answer: 'in' | 'waiting'; added_by: number; added_by_name: string }
+export interface GameDuty { duty_id: number; name: string; user_id: number; done: boolean }
+export interface Duty { id: number; group_id: number; name: string; position: number }
+export interface Reliability { user_id: number; games: number; came: number; late_outs: number; no_shows: number; no_answer: number; score: number }
+export interface Away { id: number; from: string; to: string; note: string; created_at: string }
+export interface SubOffer { id: number; offered_by: string; in_group: boolean; game: { id: number; group_id: number; group_name: string; emoji: string; sport: string; starts_at: string; venue: string; in: number; min_players: number; max_players: number } }
 
 export interface Row {
   user_id: number; name: string; member: boolean; played: number; won: number; drawn: number; lost: number; points: number; for: number; against: number

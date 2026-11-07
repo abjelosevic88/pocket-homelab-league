@@ -15,20 +15,21 @@ func LocalNow() string { return time.Now().Format("2006-01-02T15:04") }
 const gameCols = `g.id, g.group_id, COALESCE(g.user_id, 0), g.status, g.starts_at, g.duration_min, g.title, g.notes,
 	g.venue_name, g.venue_address, g.venue_lat, g.venue_lon, g.min_players, g.max_players, g.cost_cents, g.currency,
 	g.vote_until, g.cancel_reason, g.auto, g.sent, g.created_at, g.updated_at,
-	(SELECT COUNT(1) FROM answers a WHERE a.game_id = g.id AND a.answer = 'in'),
+	(SELECT COUNT(1) FROM answers a WHERE a.game_id = g.id AND a.answer = 'in') + (SELECT COUNT(1) FROM game_guests x WHERE x.game_id = g.id AND x.answer = 'in'),
 	(SELECT COUNT(1) FROM answers a WHERE a.game_id = g.id AND a.answer = 'maybe'),
 	(SELECT COUNT(1) FROM answers a WHERE a.game_id = g.id AND a.answer = 'out'),
-	(SELECT COUNT(1) FROM answers a WHERE a.game_id = g.id AND a.answer = 'waiting'),
+	(SELECT COUNT(1) FROM answers a WHERE a.game_id = g.id AND a.answer = 'waiting') + (SELECT COUNT(1) FROM game_guests x WHERE x.game_id = g.id AND x.answer = 'waiting'),
 	COALESCE((SELECT a.answer FROM answers a WHERE a.game_id = g.id AND a.user_id = ?), ''),
 	(SELECT COUNT(1) FROM matches x WHERE x.game_id = g.id),
-	(SELECT COUNT(1) FROM messages c WHERE c.game_id = g.id AND c.kind = 'text' AND c.deleted_at IS NULL)`
+	(SELECT COUNT(1) FROM messages c WHERE c.game_id = g.id AND c.kind = 'text' AND c.deleted_at IS NULL),
+	(SELECT COUNT(1) FROM game_guests x WHERE x.game_id = g.id)`
 
 func scanGame(row interface{ Scan(...any) error }) (*Game, error) {
 	var g Game
 	if err := row.Scan(&g.ID, &g.GroupID, &g.UserID, &g.Status, &g.StartsAt, &g.DurationMin, &g.Title, &g.Notes,
 		&g.VenueName, &g.VenueAddress, &g.VenueLat, &g.VenueLon, &g.MinPlayers, &g.MaxPlayers, &g.CostCents, &g.Currency,
 		&g.VoteUntil, &g.CancelReason, &g.Auto, &g.Sent, &g.CreatedAt, &g.UpdatedAt,
-		&g.In, &g.Maybe, &g.Out, &g.Waiting, &g.MyAnswer, &g.Matches, &g.Comments); err != nil {
+		&g.In, &g.Maybe, &g.Out, &g.Waiting, &g.MyAnswer, &g.Matches, &g.Comments, &g.Guests); err != nil {
 		return nil, notFound(err)
 	}
 	return &g, nil
@@ -179,7 +180,7 @@ func (s *Store) DeleteGame(ctx context.Context, id int64) error {
 
 // Answers lists who answered for a game, in the order they answered.
 func (s *Store) Answers(ctx context.Context, gameID int64) ([]Answer, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT game_id, user_id, answer, side, note, answered_at FROM answers WHERE game_id = ? ORDER BY answered_at, user_id`, gameID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT game_id, user_id, answer, side, note, answered_at, no_show FROM answers WHERE game_id = ? ORDER BY answered_at, user_id`, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +188,7 @@ func (s *Store) Answers(ctx context.Context, gameID int64) ([]Answer, error) {
 	out := []Answer{}
 	for rows.Next() {
 		var a Answer
-		if err := rows.Scan(&a.GameID, &a.UserID, &a.Answer, &a.Side, &a.Note, &a.AnsweredAt); err != nil {
+		if err := rows.Scan(&a.GameID, &a.UserID, &a.Answer, &a.Side, &a.Note, &a.AnsweredAt, &a.NoShow); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

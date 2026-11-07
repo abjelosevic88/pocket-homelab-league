@@ -6,7 +6,7 @@ import { useApp } from '../lib/app-context'
 import { announceChange, useAppState, useLiveEvents, useOnChange } from '../lib/data'
 import { fmtDate, fmtDateTime } from '../lib/format'
 import { WEEKDAYS, money, when } from '../lib/league'
-import type { Game, Group as GroupT, Match, Member, Row, Venue } from '../lib/types'
+import type { Game, Group as GroupT, Match, Member, Reliability, Row, Venue } from '../lib/types'
 import { cap, FormDots, GameCard, MatchRow } from '../components/Bits'
 import { Chat } from '../components/Chat'
 import { GroupForm } from '../components/GroupForm'
@@ -198,6 +198,8 @@ function PeopleTab({ d, reload }: { d: Detail; reload: () => void }) {
   const [edit, setEdit] = useState<Member | null>(null)
   const [del, setDel] = useState<Member | null>(null)
   const waiting = d.members.filter(m => m.can_link && !m.joined)
+  const [rel, setRel] = useState<Record<number, Reliability>>({})
+  useEffect(() => { api.get<Reliability[]>(`${V1}/groups/${g.id}/reliability`).then(l => setRel(Object.fromEntries(l.map(x => [x.user_id, x])))).catch(() => {}) }, [g.id, d])
   const inviteAll = async () => {
     try {
       const r = await api.post<{ sent: number; failed: number; error: string; no_email: string[] }>(`${V1}/groups/${g.id}/invite-all`)
@@ -226,6 +228,7 @@ function PeopleTab({ d, reload }: { d: Detail; reload: () => void }) {
                 {m.account === 'player' ? (m.joined ? `came in${m.last_seen_at ? ` · last here ${fmtDateTime(m.last_seen_at, false)}` : ''}` : m.link_sent_at ? `link sent ${fmtDate(m.link_sent_at, false)} · not in yet` : 'not in yet') : 'has an account here'}
                 {org && (m.email || m.phone) ? ` · ${[m.email, m.phone].filter(Boolean).join(' · ')}` : ''}
               </span>
+              {rel[m.user_id] && rel[m.user_id].games > 0 && <span className="small ellipsis block-line rel-line">{relWords(rel[m.user_id])}</span>}
             </Link>
             {m.can_link && !m.joined && <button type="button" className="btn sm" onClick={() => setLink(m)}><Icon name="link" size={14} />Get them in</button>}
             {items.length > 0 && <MenuButton label={`${m.name}: more`} items={items} align="right" width={240}><Icon name="more" size={16} /></MenuButton>}
@@ -241,6 +244,14 @@ function PeopleTab({ d, reload }: { d: Detail; reload: () => void }) {
       {g.next_game && <p className="muted small">Next game: {when(g.next_game.starts_at)}.</p>}
     </div>
   )
+}
+
+function relWords(r: Reliability) {
+  const parts = [`came ${r.came} of ${r.games}`]
+  if (r.late_outs) parts.push(`${r.late_outs} late ${r.late_outs === 1 ? 'drop-out' : 'drop-outs'}`)
+  if (r.no_shows) parts.push(`${r.no_shows} no-${r.no_shows === 1 ? 'show' : 'shows'}`)
+  if (r.no_answer) parts.push(`no answer ${r.no_answer}×`)
+  return <><span className={`rel-score ${r.score < 0 ? '' : r.score >= 85 ? 'ok' : r.score >= 65 ? 'mid' : 'low'}`}>{r.score < 0 ? '—' : `${r.score}%`}</span> {parts.join(' · ')}</>
 }
 
 function TournamentsTab({ g }: { g: GroupT }) {

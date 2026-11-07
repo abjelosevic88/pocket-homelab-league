@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -10,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // uploads a file as the person, returns status and body
@@ -127,4 +129,124 @@ func decodeMap(t *testing.T, b []byte) map[string]any {
 		t.Fatalf("json: %v %s", err, b)
 	}
 	return m
+}
+
+func soon(h int) string {
+	return time.Now().Add(time.Duration(h) * time.Hour).Format("2006-01-02T15:04")
+}
+
+func TestGuestsTakeAPlace(t *testing.T) {
+	a := newApp(t, nil)
+	gid, _ := tennis(a)
+	g := "/api/v1/groups/" + gid
+	a.ok(a.alice, "POST", g+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	gm := a.ok(a.alice, "POST", g+"/games", map[string]any{"starts_at": soon(72), "im_in": true, "max_players": 2})
+	game := "/api/v1/games/" + id(gm["game"].(map[string]any))
+	a.ok(a.bob, "POST", game+"/answer", map[string]any{"answer": "in"})
+	d := a.ok(a.alice, "POST", game+"/guests", map[string]any{"name": "Mia"})
+	gs := d["guests"].([]any)
+	if len(gs) != 1 || gs[0].(map[string]any)["answer"] != "waiting" {
+		t.Fatalf("full game: guest should wait: %v", gs)
+	}
+	// Bob can't come: the guest moves up
+	d = a.ok(a.bob, "POST", game+"/answer", map[string]any{"answer": "out"})
+	if d["guests"].([]any)[0].(map[string]any)["answer"] != "in" || num(d["game"].(map[string]any), "in") != 2 {
+		t.Fatalf("guest moved up: %v", d["guests"])
+	}
+	// Bob can't take Alice's guest off
+	gidS := id(gs[0].(map[string]any))
+	a.expect(403, a.bob, "DELETE", game+"/guests/"+gidS, nil)
+	a.ok(a.alice, "DELETE", game+"/guests/"+gidS, nil)
+}
+
+func TestReliabilityAwayAndChores(t *testing.T) {
+	a := newApp(t, nil)
+	gid, _ := tennis(a)
+	g := "/api/v1/groups/" + gid
+	a.ok(a.alice, "POST", g+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	// a late drop-out
+	gm := a.ok(a.alice, "POST", g+"/games", map[string]any{"starts_at": soon(5), "im_in": true})
+	game := "/api/v1/games/" + id(gm["game"].(map[string]any))
+	a.ok(a.bob, "POST", game+"/answer", map[string]any{"answer": "in"})
+	a.ok(a.bob, "POST", game+"/answer", map[string]any{"answer": "out"})
+	_, _, l := a.call(a.alice, "GET", g+"/reliability", nil)
+	var bob map[string]any
+	for _, x := range l {
+		if int64(num(x.(map[string]any), "user_id")) == a.ids["Bob"] {
+			bob = x.(map[string]any)
+		}
+	}
+	if bob == nil || num(bob, "late_outs") != 1 || len(l) != 2 {
+		t.Fatalf("reliability: %v", l)
+	}
+	if _, _, mine := a.call(a.bob, "GET", g+"/reliability", nil); len(mine) != 1 {
+		t.Fatalf("Bob sees others' reliability: %v", mine)
+	}
+	// away: a game on those days is "out" for Bob, and he isn't asked
+	day := time.Now().AddDate(0, 0, 10).Format("2006-01-02")
+	a.ok(a.bob, "POST", "/api/v1/away", map[string]any{"from": day, "to": day, "note": "Holidays"})
+	if l := a.list(a.alice, "/api/v1/away"); len(l) != 0 {
+		t.Fatal("away days are per person")
+	}
+	gm2 := a.ok(a.alice, "POST", g+"/games", map[string]any{"starts_at": day + "T19:00", "im_in": true})
+	for _, p := range gm2["people"].([]any) {
+		pm := p.(map[string]any)
+		if int64(num(pm, "user_id")) == a.ids["Bob"] && (pm["answer"] != "out" || pm["note"] != "Holidays") {
+			t.Fatalf("away answer: %v", pm)
+		}
+	}
+	// chores: given to someone in, handed over only by them or an organiser
+	a.ok(a.alice, "PUT", g+"/duties", map[string]any{"names": []string{"Balls", "Book the court", "balls"}})
+	ds := a.list(a.alice, g+"/duties")
+	if len(ds) != 2 {
+		t.Fatalf("duties: %v", ds)
+	}
+	gm3, _ := a.st.GameByID(context.Background(), int64(num(gm2["game"].(map[string]any), "id")))
+	grp, _ := a.st.GroupByID(context.Background(), n(gid))
+	a.s.assignDuties(context.Background(), grp, gm3, false)
+	d := a.ok(a.alice, "GET", "/api/v1/games/"+itoa(gm3.ID), nil)
+	for _, x := range d["duties"].([]any) {
+		if int64(num(x.(map[string]any), "user_id")) != a.ids["Alice"] {
+			t.Fatalf("chore not given to the one who is in: %v", d["duties"])
+		}
+	}
+	duty := itoa(int64(num(ds[0].(map[string]any), "id")))
+	a.expect(403, a.bob, "POST", "/api/v1/games/"+itoa(gm3.ID)+"/duties/"+duty, map[string]any{"done": true})
+	a.ok(a.alice, "POST", "/api/v1/games/"+itoa(gm3.ID)+"/duties/"+duty, map[string]any{"user_id": a.ids["Bob"]})
+	a.ok(a.bob, "POST", "/api/v1/games/"+itoa(gm3.ID)+"/duties/"+duty, map[string]any{"done": true})
+}
+
+func TestFindingASub(t *testing.T) {
+	a := newApp(t, nil)
+	gid, _ := tennis(a)
+	// Bob plays in Alice's other tennis group, not this one
+	other := a.ok(a.alice, "POST", "/api/v1/groups", map[string]any{"name": "Weekend Tennis", "sport": "tennis"})
+	a.ok(a.alice, "POST", "/api/v1/groups/"+id(other)+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	gm := a.ok(a.alice, "POST", "/api/v1/groups/"+gid+"/games", map[string]any{"starts_at": soon(30), "im_in": true, "min_players": 2, "max_players": 2})
+	game := "/api/v1/games/" + id(gm["game"].(map[string]any))
+	dry := a.ok(a.alice, "POST", game+"/sub", map[string]any{"others": true, "dry_run": true})
+	if num(dry, "others") != 1 {
+		t.Fatalf("dry run: %v", dry)
+	}
+	a.expect(404, a.bob, "POST", game+"/sub", nil)
+	r := a.ok(a.alice, "POST", game+"/sub", map[string]any{"others": true})
+	if num(r, "asked") != 1 {
+		t.Fatalf("asked: %v", r)
+	}
+	subs := a.list(a.bob, "/api/v1/subs")
+	if len(subs) != 1 {
+		t.Fatalf("Bob's offers: %v", subs)
+	}
+	take := a.ok(a.bob, "POST", "/api/v1/subs/"+id(subs[0].(map[string]any)), nil)
+	if take["answer"] != "in" {
+		t.Fatalf("take: %v", take)
+	}
+	// Bob is in the group now and in the game; the offer is gone
+	d := a.ok(a.bob, "GET", game, nil)
+	if num(d["game"].(map[string]any), "in") != 2 {
+		t.Fatalf("not in: %v", d["game"])
+	}
+	if l := a.list(a.bob, "/api/v1/subs"); len(l) != 0 {
+		t.Fatalf("offer still open: %v", l)
+	}
 }

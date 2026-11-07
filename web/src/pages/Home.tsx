@@ -10,6 +10,7 @@ import { GameCard, MatchRow } from '../components/Bits'
 import { Icon } from '../components/icons'
 import { openCreate } from '../components/Layout'
 import { PushNudge } from '../components/PushCard'
+import { SubOffers } from '../components/SubOffers'
 import { Empty, Loading, useAsync } from '../components/ui'
 
 export default function Home() {
@@ -39,6 +40,7 @@ export default function Home() {
       <div className="page-head"><div className="grow"><h1 className="page-title">{first ? `Hi ${first}` : 'Home'}</h1>
         <p className="muted">{data.next[0] ? <>Next: <b>{data.next[0].group_name}</b>, {when(data.next[0].starts_at)}</> : 'Nothing planned yet.'}</p></div></div>
       <PushNudge />
+      <SubOffers />
 
       {data.unanswered.length > 0 && <section className="stack">
         <div className="sec-head"><Icon name="help" size={16} /><h3>Are you in?</h3><span className="count">{data.unanswered.length}</span></div>
