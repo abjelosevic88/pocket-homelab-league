@@ -29,6 +29,14 @@
     <td align="center"><sub>Finding a time: everyone votes; it settles on the best one by itself.</sub></td>
   </tr>
   <tr>
+    <td width="50%"><img src="docs/screenshots/desktop-tournament.png" alt="A tournament"></td>
+    <td width="50%"><img src="docs/screenshots/phone-tournament-public.png" alt="A tournament's share page"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>A knockout with byes, a match for third place and the podium.</sub></td>
+    <td align="center"><sub>An Americano on its share page: anyone with the link, no account.</sub></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="docs/screenshots/phone-home.png" alt="On a phone"></td>
     <td width="50%"><img src="docs/screenshots/phone-game.png" alt="A game on a phone"></td>
   </tr>
@@ -41,6 +49,7 @@
 - **Who's in.** In / maybe / out in one tap; a full game puts a yes on the waiting list and moves the first one up when someone drops out. Two days before, those who didn't answer are asked; the day before, organisers hear when it's short; everyone who's in gets a reminder (with the weather for outdoor games) and another a few hours before.
 - **Fair teams.** Split the people who are in into two teams with ratings as close as possible; shuffle for another fair split; tap a name to move it.
 - **Scores and the table.** Anyone enters a result, someone else who played confirms it (or says what's wrong — a disputed result leaves the table until it's fixed; unquestioned ones confirm themselves after two days). The table has points, games or goals for and against, form, streaks, scorers and an Elo-style rating; each player has a page with their rating over time and their record against and with everyone. Player of the game by vote.
+- **Tournaments for every sport.** Knockout (byes for the top seeds, a match for third place, a plate), double elimination, round robin, groups then knockout, Swiss (with Buchholz and Sonneborn-Berger, colours for chess), Americano, Mexicano and King of the Court for padel and pickleball, team ties (two singles and a doubles…), scored rounds for golf (Stableford or stroke play with handicaps and countback) and bowling (handicaps), a challenge ladder and box leagues for a season, and an arena. Each sport's own tie-breakers (head-to-head, set and game ratio, goal difference, FIVB points…), seeding by rating, sign-up with a waiting list, check-in, entry fees, walkovers, withdrawals, courts with "you're on Court 2 now", results confirmed by the other side, a podium in the chat, titles on player pages, and a read-only link to share with anyone (no account) — printable too.
 - **Chat.** A live chat per group and comments per game, with reactions; League adds a line when a game is planned, moved, cancelled or has a result. The AI never writes in a chat — "Catch me up" and the match report are drafted for you only.
 - **Players from outside.** Add someone with an email or a phone number and an account is made for them on the spot. They get a one-time sign-in link — emailed from your mailbox, or sent by WhatsApp, SMS or anything else — and see only their groups. Lost it? They ask for a new one by email. Spond, TeamSnap or a spreadsheet list comes in as a CSV.
 - **Any calendar.** Download a game, or subscribe to a group's games in Apple, Google or Outlook calendar.
@@ -76,7 +85,7 @@ Set `CORE_URL` and `CORE_REGISTRATION_KEY` and League joins the box: people sign
 
 **Nothing depends on another app.** Each app's state is checked per person — connected, switched off here, switched off in Pocket Core, not on this box, too old — and what needs it is greyed out with one line saying why and what to do, never hidden.
 
-Other apps use League through `league:read` and `league:write`: Pocket Day shows today's game and writes your results into the journal, Pocket Search finds groups, players, games and chat lines, Pocket Weather warns about rain at game time, Pocket AI knows your next game and can say you're in (`league:write` is answering only — no messages, no results). Events on the bus — `league.game_planned`, `league.game_changed`, `league.game_cancelled`, `league.vote_started`, `league.answered`, `league.short`, `league.result`, `league.reminder` — start flows in Pocket Flows. Without Core every connection can be made directly with a URL and a token.
+Other apps use League through `league:read` and `league:write`: Pocket Day shows today's game and writes your results into the journal, Pocket Search finds groups, players, games and chat lines, Pocket Weather warns about rain at game time, Pocket AI knows your next game and can say you're in (`league:write` is answering only — no messages, no results). Events on the bus — `league.game_planned`, `league.game_changed`, `league.game_cancelled`, `league.vote_started`, `league.answered`, `league.short`, `league.result`, `league.reminder`, `league.tournament_started`, `league.tournament_finished` — start flows in Pocket Flows. Without Core every connection can be made directly with a URL and a token.
 
 ## Develop
 

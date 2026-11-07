@@ -14,16 +14,18 @@ import { Icon } from '../components/icons'
 import { openCreate, useCrumb } from '../components/Layout'
 import { AddPerson, EditMember, LinkSheet } from '../components/People'
 import { ResultForm } from '../components/ResultForm'
+import { TournamentList } from './Tournaments'
+import type { Tournament } from '../lib/tour'
 import { Avatar, Confirm, Empty, Loading, type MenuItem, MenuButton, Segmented, Tabs, useToast } from '../components/ui'
 
-type Tab = 'games' | 'chat' | 'table' | 'results' | 'people'
+type Tab = 'games' | 'chat' | 'table' | 'results' | 'tournaments' | 'people'
 interface Detail { group: GroupT; members: Member[]; upcoming: Game[]; feed_url: string; venues: Venue[] }
 
 export default function Group() {
   const { id } = useParams()
   const gid = Number(id)
   const [sp, setSp] = useSearchParams()
-  const tab = (['games', 'chat', 'table', 'results', 'people'].includes(sp.get('tab') || '') ? sp.get('tab') : 'games') as Tab
+  const tab = (['games', 'chat', 'table', 'results', 'tournaments', 'people'].includes(sp.get('tab') || '') ? sp.get('tab') : 'games') as Tab
   const navigate = useNavigate()
   const { toast } = useToast()
   const places = useAppState()('places', 'places:write')
@@ -77,11 +79,12 @@ export default function Group() {
           <MenuButton label="More" items={menu} align="right" width={260}><Icon name="more" size={18} /></MenuButton>
         </div>
       </header>
-      <Tabs value={tab} onChange={go} tabs={[{ id: 'games', label: 'Games', icon: 'calendar' }, { id: 'chat', label: g.unread ? `Chat (${g.unread})` : 'Chat', icon: 'message' }, { id: 'table', label: 'Table', icon: 'chart' }, { id: 'results', label: 'Results', icon: 'trophy' }, { id: 'people', label: 'People', icon: 'users' }]} />
+      <Tabs value={tab} onChange={go} tabs={[{ id: 'games', label: 'Games', icon: 'calendar' }, { id: 'chat', label: g.unread ? `Chat (${g.unread})` : 'Chat', icon: 'message' }, { id: 'table', label: 'Table', icon: 'chart' }, { id: 'results', label: 'Results', icon: 'trophy' }, { id: 'tournaments', label: 'Tournaments', icon: 'layers' }, { id: 'people', label: 'People', icon: 'users' }]} />
       {tab === 'games' && <GamesTab d={d} />}
       {tab === 'chat' && <div className="card chat-card"><Chat groupId={gid} organiser={org} aiCatchUp /></div>}
       {tab === 'table' && <TableTab g={g} />}
       {tab === 'results' && <ResultsTab g={g} />}
+      {tab === 'tournaments' && <TournamentsTab g={g} />}
       {tab === 'people' && <PeopleTab d={d} reload={load} />}
       {editing && <GroupForm group={g} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load() }} />}
       {leave && <Confirm title={`Leave ${g.name}?`} confirmLabel="Leave" message="You no longer see its games and chat. Your results stay in its table." onCancel={() => setLeave(false)}
@@ -236,6 +239,19 @@ function PeopleTab({ d, reload }: { d: Detail; reload: () => void }) {
       {del && <Confirm title={`Take ${del.name} out of ${g.name}?`} confirmLabel="Take out" message="They no longer see this group. Their results stay in the table." onCancel={() => setDel(null)}
         onConfirm={async () => { const x = del; setDel(null); try { await api.del(`${V1}/groups/${g.id}/members/${x.user_id}`); reload(); announceChange() } catch (e) { toast((e as Error).message, 'err') } }} />}
       {g.next_game && <p className="muted small">Next game: {when(g.next_game.starts_at)}.</p>}
+    </div>
+  )
+}
+
+function TournamentsTab({ g }: { g: GroupT }) {
+  const [list, setList] = useState<Tournament[] | null>(null)
+  const load = useCallback(() => api.get<Tournament[]>(`${V1}/groups/${g.id}/tournaments`).then(setList).catch(() => setList([])), [g.id])
+  useEffect(() => { load() }, [load])
+  useLiveEvents(e => { if (e.type === 'tournament' && e.data.group_id === g.id) load() })
+  return (
+    <div className="stack">
+      <div className="row"><button type="button" className="btn primary" onClick={() => openCreate('tournament', g.id)}><Icon name="trophy" size={15} />New tournament</button></div>
+      {list === null ? <Loading /> : list.length === 0 ? <Empty icon="trophy" title="No tournaments yet">A knockout cup, an Americano evening, a ladder for the season…</Empty> : <TournamentList list={list} showGroup={false} />}
     </div>
   )
 }

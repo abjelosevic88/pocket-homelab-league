@@ -1,7 +1,7 @@
 import { Modal } from './ui'
 
 const GROUPS: { title: string; keys: [string[], string][] }[] = [
-  { title: 'Go to', keys: [[['h'], 'Home'], [['p'], 'Games'], [['t'], 'Results'], [[','], 'Settings'], [['/'], 'Search & commands'], [['⌘', 'K'], 'Search & commands']] },
+  { title: 'Go to', keys: [[['h'], 'Home'], [['p'], 'Games'], [['t'], 'Tournaments'], [['u'], 'Results'], [[','], 'Settings'], [['/'], 'Search & commands'], [['⌘', 'K'], 'Search & commands']] },
   { title: 'Make', keys: [[['n'], 'Plan a game'], [['r'], 'Enter a result'], [['g'], 'A new group']] },
   { title: 'Window', keys: [[['['], 'Show or hide the sidebar'], [['esc'], 'Close a dialog or menu']] },
   { title: 'Help', keys: [[['?'], 'This sheet']] },

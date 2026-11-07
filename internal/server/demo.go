@@ -376,7 +376,105 @@ func (s *Server) seedDemo(ctx context.Context, owner int64) error {
 			_ = s.store.MarkRead(ctx, g.ID, owner, ms[len(ms)-3].ID)
 		}
 	}
+	s.demoTournaments(ctx, owner, tennis, padel, football, rnd)
 	s.log.Info("demo data seeded", "groups", 3, "people", len(ids))
 	_ = fmt.Sprint
 	return nil
+}
+
+// demoTournaments: a finished tennis knockout, an Americano half played and
+// a five-a-side cup still open for sign-up.
+func (s *Server) demoTournaments(ctx context.Context, owner int64, tennis, padel, football *store.Group, rnd *rand.Rand) {
+	mk := func(g *store.Group, name, format, kind string, everyone bool, set func(*TSettings)) *store.Tournament {
+		ts := defaultSettings(g, format, 0)
+		if set != nil {
+			set(&ts)
+		}
+		b, _ := json.Marshal(ts)
+		t := &store.Tournament{GroupID: g.ID, Name: name, Format: format, EntryKind: kind, Status: "signup", Rated: false, Currency: g.Currency, VenueName: g.VenueName, Settings: b}
+		if err := s.store.CreateTournament(ctx, owner, t); err != nil {
+			return nil
+		}
+		_ = s.store.SetCourts(ctx, t.ID, []string{"Court 1", "Court 2"})
+		if everyone {
+			ms, _ := s.store.Members(ctx, g.ID)
+			for _, m := range ms {
+				_ = s.store.SaveEntry(ctx, &store.TEntry{TournamentID: t.ID, Name: m.Display(), Members: []store.TEntryMember{{UserID: m.UserID}}, CreatedBy: owner})
+			}
+		}
+		return t
+	}
+	playN := func(t *store.Tournament, g *store.Group, n int, body func(m *store.TMatch)) {
+		for i := 0; i < n; i++ {
+			ms, _ := s.store.TMatches(ctx, t.ID)
+			var next *store.TMatch
+			for _, m := range ms {
+				if m.Status == "ready" || m.Status == "called" {
+					next = m
+					break
+				}
+			}
+			if next == nil {
+				return
+			}
+			body(next)
+			now := store.Now()
+			next.Status, next.Outcome, next.ConfirmedAt, next.ReportedBy, next.ConfirmedBy = "done", "normal", &now, owner, owner
+			if err := s.store.SaveTMatch(ctx, next); err != nil {
+				return
+			}
+			t, _ = s.store.GetTournament(ctx, t.ID)
+			s.confirmed(ctx, t, g, next, owner)
+		}
+	}
+	// Tennis: the autumn cup, played to the end
+	if t := mk(tennis, "Autumn Cup", "knockout", "player", true, func(x *TSettings) { x.ThirdPlace = true }); t != nil {
+		if s.draw(ctx, t, tennis) == nil {
+			playN(t, tennis, 20, func(m *store.TMatch) {
+				aw := rnd.Intn(3) > 0
+				sets := [][2]int{{6, 3 + rnd.Intn(3)}, {6, 2 + rnd.Intn(4)}}
+				if !aw {
+					sets = [][2]int{{3 + rnd.Intn(3), 6}, {7, 5}, {4, 6}}
+				}
+				m.Score, m.Winner = store.Score{Sets: sets}, map[bool]string{true: "a", false: "b"}[aw]
+			})
+		}
+	}
+	// Padel: an Americano for the five of them plus three guests, three rounds of seven played
+	if t := mk(padel, "Friday Americano", "americano", "player", true, func(x *TSettings) { x.Rounds, x.Points = 7, 24 }); t != nil {
+		for _, n := range []string{"Mia (guest)", "Luka (guest)", "Sara (guest)"} {
+			_ = s.store.SaveEntry(ctx, &store.TEntry{TournamentID: t.ID, Name: n, CreatedBy: owner, Rating: 1000})
+		}
+		if s.draw(ctx, t, padel) == nil {
+			playN(t, padel, 6, func(m *store.TMatch) {
+				a := float64(8 + rnd.Intn(9))
+				b := 24 - a
+				m.ATotal, m.BTotal = &a, &b
+				m.Winner = "draw"
+				if a > b {
+					m.Winner = "a"
+				} else if b > a {
+					m.Winner = "b"
+				}
+			})
+		}
+	}
+	// Five-a-side: a cup with groups, sign-up open
+	if t := mk(football, "Winter Cup", "groups_knockout", "team", false, func(x *TSettings) { x.Groups, x.Advance = 2, 1 }); t != nil {
+		t.StartsAt = time.Now().AddDate(0, 0, 20).Format("2006-01-02") + "T10:00"
+		t.Capacity, t.FeeCents = 8, 6000
+		_ = s.store.UpdateTournament(ctx, t)
+		ms, _ := s.store.Members(ctx, football.ID)
+		for i := 0; i+2 < len(ms) && i < 9; i += 3 {
+			var mem []store.TEntryMember
+			for j, m := range ms[i : i+3] {
+				role := "player"
+				if j == 0 {
+					role = "captain"
+				}
+				mem = append(mem, store.TEntryMember{UserID: m.UserID, Role: role})
+			}
+			_ = s.store.SaveEntry(ctx, &store.TEntry{TournamentID: t.ID, Name: "Team " + firstName(ms[i].Display()), Members: mem, CreatedBy: owner, Paid: i == 0})
+		}
+	}
 }

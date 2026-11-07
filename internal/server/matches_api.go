@@ -508,6 +508,16 @@ func (s *Server) handlePlayer(w http.ResponseWriter, r *http.Request) {
 	if mine != nil {
 		mine.MVP = mvps[pid]
 	}
+	titles, _ := s.store.TitlesOf(ctx, g.ID, pid)
+	type title struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+		At   string `json:"at"`
+	}
+	tl := []title{}
+	for _, t := range titles {
+		tl = append(tl, title{t.ID, t.Name, firstNonEmpty(t.StartsAt, t.UpdatedAt)})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"user_id": pid, "name": firstNonEmpty(names[pid], "Former player"), "row": mine, "history": hist,
-		"recent": recent, "versus": out, "group": viewGroup(g)})
+		"recent": recent, "versus": out, "group": viewGroup(g), "titles": tl})
 }

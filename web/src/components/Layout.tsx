@@ -11,6 +11,7 @@ import { ShortcutsSheet } from './ShortcutsSheet'
 import { GroupForm } from './GroupForm'
 import { GameForm } from './GameForm'
 import { ResultForm } from './ResultForm'
+import { TournamentForm } from './TournamentForm'
 import { Avatar, Loading, type MenuItem, MenuButton, modalOpen, useIsMobile, useMediaQuery } from './ui'
 import { AskButton } from './AskButton'
 
@@ -25,7 +26,7 @@ export function useCrumb(title: string | undefined) {
   useEffect(() => { set(title || ''); return () => set('') }, [title, set])
 }
 
-export type CreateKind = 'group' | 'game' | 'result'
+export type CreateKind = 'group' | 'game' | 'result' | 'tournament'
 
 /** Start something from anywhere (a page's button), for a group when known. */
 export const openCreate = (k: CreateKind, groupId?: number, gameId?: number) => window.dispatchEvent(new CustomEvent('plg:create', { detail: { kind: k, groupId, gameId } }))
@@ -35,6 +36,7 @@ export function createItems(onCreate: (k: CreateKind) => void, { player, hasGrou
   return [
     { label: 'Plan a game', icon: 'calendar-plus', hint: 'N', disabled: !hasGroups, onSelect: () => onCreate('game') },
     { label: 'Enter a result', icon: 'trophy', hint: 'R', disabled: !hasGroups, onSelect: () => onCreate('result') },
+    { label: 'New tournament', icon: 'layers', hint: 'T', disabled: !hasGroups, onSelect: () => onCreate('tournament') },
     'sep',
     { label: player ? 'New group (members only)' : 'New group', icon: 'users', hint: 'G', disabled: player, onSelect: () => onCreate('group') },
   ]
@@ -101,7 +103,8 @@ function Shell() {
         case 'g': mk('group'); break
         case 'h': go('/'); break
         case 'p': go('/games'); break
-        case 't': go('/results'); break
+        case 't': go('/tournaments'); break
+        case 'u': go('/results'); break
         case ',': go('/settings'); break
         case '[': e.preventDefault(); toggleSidebar(); break
       }
@@ -116,7 +119,9 @@ function Shell() {
     ...(player ? [] : [{ id: 'group', label: 'New group', icon: 'users', hint: 'G', keywords: 'team club sport create', run: () => create('group') }]),
     { id: 'home', label: 'Home', icon: 'home', hint: 'H', run: () => navigate('/') },
     { id: 'games', label: 'Games', icon: 'calendar', hint: 'P', keywords: 'upcoming next', run: () => navigate('/games') },
-    { id: 'results', label: 'Results', icon: 'trophy', hint: 'T', keywords: 'scores matches', run: () => navigate('/results') },
+    { id: 'results', label: 'Results', icon: 'trophy', hint: 'U', keywords: 'scores matches', run: () => navigate('/results') },
+    { id: 'tournaments', label: 'Tournaments', icon: 'layers', hint: 'T', keywords: 'cup knockout bracket americano ladder', run: () => navigate('/tournaments') },
+    { id: 'tournament', label: 'New tournament', icon: 'layers', keywords: 'cup knockout bracket americano mexicano ladder swiss league', run: () => create('tournament') },
     ...live.flatMap(g => [
       { id: `g-${g.id}`, label: g.name, icon: 'users', keywords: `${g.sport_label} group`, run: () => navigate(`/groups/${g.id}`) },
       { id: `t-${g.id}`, label: `${g.name}: the table`, icon: 'chart', keywords: 'standings rating', run: () => navigate(`/groups/${g.id}?tab=table`) },
@@ -149,13 +154,14 @@ function Shell() {
         {shortcuts && <ShortcutsSheet onClose={() => setShortcuts(false)} />}
         {making?.kind === 'group' && <GroupForm onClose={() => setMaking(null)} onSaved={g => { setMaking(null); navigate(`/groups/${g.id}`) }} />}
         {making?.kind === 'game' && <GameForm groupId={making.groupId} onClose={() => setMaking(null)} onSaved={id => { setMaking(null); navigate(`/games/${id}`) }} />}
+        {making?.kind === 'tournament' && <TournamentForm groupId={making.groupId} onClose={() => setMaking(null)} onSaved={id => { setMaking(null); navigate(`/tournaments/${id}`) }} />}
         {making?.kind === 'result' && <ResultForm groupId={making.groupId} gameId={making.gameId} onClose={() => setMaking(null)} onSaved={() => setMaking(null)} />}
       </div>
     </CrumbCtx.Provider>
   )
 }
 
-const SECTION: Record<string, [string, string]> = { '': ['Home', '/'], games: ['Games', '/games'], results: ['Results', '/results'], groups: ['Groups', '/'] }
+const SECTION: Record<string, [string, string]> = { '': ['Home', '/'], games: ['Games', '/games'], results: ['Results', '/results'], groups: ['Groups', '/'], tournaments: ['Tournaments', '/tournaments'] }
 
 function TopBar({ onMenu, onPalette, mobile, compact, sidebarOpen, crumb }: { onMenu: () => void; onPalette: () => void; mobile: boolean; compact: boolean; sidebarOpen: boolean; crumb: string }) {
   const { user, themeMode, setThemeMode, status, setUser } = useApp()

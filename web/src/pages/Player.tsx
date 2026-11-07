@@ -9,7 +9,7 @@ import { Icon } from '../components/icons'
 import { useCrumb } from '../components/Layout'
 import { Avatar, Empty, Loading, useAsync } from '../components/ui'
 
-interface PlayerView { user_id: number; name: string; row: Row | null; history: { at: string; rating: number }[]; recent: Match[]; versus: Versus[]; group: Group }
+interface PlayerView { user_id: number; name: string; row: Row | null; history: { at: string; rating: number }[]; recent: Match[]; versus: Versus[]; group: Group; titles: { id: number; name: string; at: string }[] }
 
 export default function Player() {
   const { id, uid } = useParams()
@@ -29,6 +29,7 @@ export default function Player() {
           <p className="muted small"><Link to={`/groups/${g.id}?tab=table`}>{g.sport_info?.emoji} {g.name}</Link>{r?.position ? ` · #${r.position} in the table` : ''}</p>
         </div>
       </header>
+      {p.titles?.length > 0 && <div className="titles">{p.titles.map(x => <Link key={x.id} to={`/tournaments/${x.id}`} className="title-chip">🏆 {x.name}<span className="muted small"> {fmtDate(x.at, true)}</span></Link>)}</div>}
       {!r || r.played === 0 ? <Empty icon="trophy" title="No matches yet">Results show up here once they have played.</Empty> : <>
         <div className="stats-row">
           <div className="stat"><span className="stat-l">Rating</span><span className="stat-v tnum">{r.rating}</span><span className="stat-s small">{r.change ? `${r.change > 0 ? '+' : ''}${Math.round(r.change)} last match` : 'start 1000'}</span></div>

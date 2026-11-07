@@ -15,6 +15,7 @@ export type LiveEvent =
   | { type: 'game'; data: { id: number; group_id: number; deleted?: boolean } }
   | { type: 'answer'; data: { game_id: number; group_id: number; user_id: number; answer: string } }
   | { type: 'match'; data: { id: number; group_id: number; game_id: number; deleted?: boolean } }
+  | { type: 'tournament'; data: { id: number; group_id: number; deleted?: boolean; called?: number } }
   | { type: 'resync'; data: null }
 
 interface DataState {
@@ -105,7 +106,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         try { data = JSON.parse((ev as MessageEvent).data) } catch { return }
         handle({ type, data } as LiveEvent)
       })
-      ;(['message', 'message_update', 'read', 'typing', 'group', 'members', 'game', 'answer', 'match'] as const).forEach(on)
+      ;(['message', 'message_update', 'read', 'typing', 'group', 'members', 'game', 'answer', 'match', 'tournament'] as const).forEach(on)
       es.onerror = () => {
         setConnected(false)
         if (es?.readyState === EventSource.CLOSED) { es.close(); retry = Math.min(retry + 1, 6); window.setTimeout(open, 1000 * 2 ** retry) }

@@ -165,6 +165,8 @@ func TestLinkScopes(t *testing.T) {
 		{"POST", "/api/v1/groups/3/matches", []string{"league:write"}, false},
 		{"GET", "/api/v1/settings", []string{"league:read"}, false},
 		{"GET", "/api/v1/auth/me", nil, true},
+		{"GET", "/api/v1/tournaments/4", []string{"league:read"}, true},
+		{"POST", "/api/v1/tmatches/4/result", []string{"league:read", "league:write"}, false},
 	} {
 		r, _ := http.NewRequest(c.m, c.p, nil)
 		if got := linkAllows(c.scopes, r); got != c.ok {
@@ -213,7 +215,7 @@ func TestSettingsArePersonal(t *testing.T) {
 }
 
 func TestPublishesOnlyLeagueEvents(t *testing.T) {
-	if len(eventTopics) != 8 {
+	if len(eventTopics) != 10 {
 		t.Fatalf("event topics: %v", eventTopics)
 	}
 	for _, e := range eventTopics {

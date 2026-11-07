@@ -52,3 +52,20 @@ JSON over HTTP at `/api/v1`. Authenticate with the session cookie, or `Authoriza
 ## Sign-in links (no token)
 
 `GET /auth/link/{token}` shows who invited whom to what; `POST /auth/link {"token"}` uses it (once) and signs in; `POST /auth/link/request {"email"}` sends a player a new one.
+
+## Tournaments
+
+| | |
+|---|---|
+| `GET /tournaments/formats?group=` | The formats, the ones that suit the group's sport first, and their default settings |
+| `GET /tournaments` · `GET /groups/{id}/tournaments` · `POST /groups/{id}/tournaments` | Tournaments · make one `{"name","format","entry_kind":"player|pair|team","settings":{…},"courts":["Court 1"],"add_members":true}` |
+| `GET /tournaments/{id}` · `PUT` · `DELETE` | Everything: entries, stages with tables or a leaderboard, matches, courts, challenges |
+| `POST /tournaments/{id}/join` · `/leave` | Sign up (`{"partner":id}` for pairs, `{"team_name":…}` for teams) · drop out (walkovers once playing) |
+| `POST /tournaments/{id}/entries` · `PUT /tournaments/{id}/entries/{eid}` · `DELETE` | Organisers: add (people or a guest's name), seed, handicap, paid, check-in, withdraw, disqualify |
+| `POST /tournaments/{id}/teams` | Make `{"teams":n}` teams of close ratings from the single sign-ups |
+| `POST /tournaments/{id}/start` · `/redraw` · `/regenerate` · `/finish` · `/next-round` | Make the draw · back to sign-up · draw the rounds not played again · finish (or `{"cancel":true}`) · a box league's next round |
+| `POST /tmatches/{id}/result` | `{"score":{…}}`, `{"a_total","b_total"}` (Americano), `{"winner"}`, `{"outcome":"walkover|retired|no_show|double_walkover"}` |
+| `POST /tmatches/{id}/confirm` · `/reopen` · `/call` | Confirm (`{"wrong":true,"reason"}` disputes) · undo (organisers) · call to a court `{"court_id"}` |
+| `PUT /tournaments/{id}/scorecards` | A score card `{"stage_id","round","entry_id","holes":[…]}` or `{"gross"}` |
+| `POST /tournaments/{id}/challenges` · `/challenges/{cid}` | Ladder: challenge `{"defender"}` · answer `{"accept":true}` |
+| `GET /public/t/{token}` | The read-only tournament for anyone with the link (no token needed) |

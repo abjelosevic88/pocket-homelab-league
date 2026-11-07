@@ -17,7 +17,7 @@ import (
 // in linkRoutes stays closed to it (403).
 
 var linkOffers = []core.Offer{
-	{Scope: "league:read", Name: "See your games and results", Description: "Read your groups, the coming games (when, where, who is in), the results, the tables and the chat headlines — for your journal, your day, search, dashboards and Pocket AI."},
+	{Scope: "league:read", Name: "See your games and results", Description: "Read your groups, the coming games (when, where, who is in), the results, the tables, the tournaments and the chat headlines — for your journal, your day, search, dashboards and Pocket AI."},
 	{Scope: "league:write", Name: "Say whether you are coming", Description: "Answer for you whether you are in, maybe or out for a game (\"I'm in for Tuesday\"). Nothing else: no messages, no results."},
 }
 
@@ -32,6 +32,7 @@ var linkRoutes = []linkRoute{
 	{"GET", regexp.MustCompile(`^/api/v1/(sports|groups|games|matches|today|summary|search|lookup|upcoming|day/\d{4}-\d{2}-\d{2})$`), "league:read"},
 	{"GET", regexp.MustCompile(`^/api/v1/groups/\d+(/table|/members|/players/\d+)?$`), "league:read"},
 	{"GET", regexp.MustCompile(`^/api/v1/games/\d+$`), "league:read"},
+	{"GET", regexp.MustCompile(`^/api/v1/(tournaments|groups/\d+/tournaments|tournaments/\d+)$`), "league:read"},
 	{"POST", regexp.MustCompile(`^/api/v1/games/\d+/answer$`), "league:write"},
 }
 

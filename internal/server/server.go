@@ -223,7 +223,7 @@ func (s *Server) coreLoop(ctx context.Context) {
 
 // eventTopics are what League publishes on the Core bus.
 var eventTopics = []string{"league.game_planned", "league.game_changed", "league.game_cancelled", "league.vote_started",
-	"league.answered", "league.short", "league.result", "league.reminder"}
+	"league.answered", "league.short", "league.result", "league.reminder", "league.tournament_started", "league.tournament_finished"}
 
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{

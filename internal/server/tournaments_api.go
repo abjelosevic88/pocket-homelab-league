@@ -344,7 +344,19 @@ func (s *Server) tDetail(ctx context.Context, t *store.Tournament, g *store.Grou
 	if public {
 		view.ShareToken = ""
 	}
-	out := map[string]any{"tournament": view, "group": viewGroup(g), "entries": es, "stages": sv, "groups": groups, "matches": ms,
+	// the podium: the places of the last stage once it is done
+	podium := []map[string]int64{}
+	if len(stages) > 0 && (t.Status == "finished" || stages[len(stages)-1].Status == "done") {
+		last := stages[len(stages)-1].ID
+		xs, _ := s.store.StageEntries(ctx, t.ID)
+		for _, x := range xs {
+			if x.StageID == last && x.FinalRank >= 1 && x.FinalRank <= 3 {
+				podium = append(podium, map[string]int64{"rank": int64(x.FinalRank), "entry_id": x.EntryID})
+			}
+		}
+		sort.Slice(podium, func(i, j int) bool { return podium[i]["rank"] < podium[j]["rank"] })
+	}
+	out := map[string]any{"tournament": view, "group": viewGroup(g), "entries": es, "stages": sv, "groups": groups, "matches": ms, "podium": podium,
 		"courts": courts, "names": names, "mine": mine, "can_run": !public && canRun(t, g, uid), "settings": settingsOf(t), "now": store.LocalNow()}
 	if t.Format == "ladder" {
 		out["challenges"], _ = s.store.Challenges(ctx, t.ID)

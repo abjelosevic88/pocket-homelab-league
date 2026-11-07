@@ -17,6 +17,8 @@ import Player from './pages/Player'
 import Games from './pages/Games'
 import Results from './pages/Results'
 import Join from './pages/Join'
+import Tournaments from './pages/Tournaments'
+import Tournament, { PublicTournament } from './pages/Tournament'
 import Settings from './pages/Settings'
 
 function Gate({ children }: { children: React.ReactNode }) {
@@ -34,12 +36,15 @@ function App() {
       <Route path="/login" element={<Login mode="login" />} />
       <Route path="/setup" element={<Login mode="setup" />} />
       <Route path="/join/:token" element={<Join />} />
+      <Route path="/t/:token" element={<PublicTournament />} />
       <Route path="/settings/:tab?" element={<Gate><ErrorBoundary where="settings"><Settings /></ErrorBoundary></Gate>} />
       <Route element={<Gate><ErrorBoundary where="league"><Layout /></ErrorBoundary></Gate>}>
         <Route path="/" element={<Home />} />
         <Route path="/games" element={<Games />} />
         <Route path="/games/:id" element={<Game />} />
         <Route path="/results" element={<Results />} />
+        <Route path="/tournaments" element={<Tournaments />} />
+        <Route path="/tournaments/:id" element={<Tournament />} />
         <Route path="/groups/:id" element={<Group />} />
         <Route path="/groups/:id/players/:uid" element={<Player />} />
         <Route path="*" element={<Navigate to="/" replace />} />
