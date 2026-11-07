@@ -13,19 +13,20 @@ import { GroupForm } from '../components/GroupForm'
 import { Icon } from '../components/icons'
 import { openCreate, useCrumb } from '../components/Layout'
 import { AddPerson, EditMember, LinkSheet } from '../components/People'
+import { MoneyTab } from '../components/MoneyTab'
 import { ResultForm } from '../components/ResultForm'
 import { TournamentList } from './Tournaments'
 import type { Tournament } from '../lib/tour'
 import { Avatar, Confirm, Empty, Loading, type MenuItem, MenuButton, Segmented, Tabs, useToast } from '../components/ui'
 
-type Tab = 'games' | 'chat' | 'table' | 'results' | 'tournaments' | 'people'
+type Tab = 'games' | 'chat' | 'table' | 'results' | 'tournaments' | 'money' | 'people'
 interface Detail { group: GroupT; members: Member[]; upcoming: Game[]; feed_url: string; venues: Venue[] }
 
 export default function Group() {
   const { id } = useParams()
   const gid = Number(id)
   const [sp, setSp] = useSearchParams()
-  const tab = (['games', 'chat', 'table', 'results', 'tournaments', 'people'].includes(sp.get('tab') || '') ? sp.get('tab') : 'games') as Tab
+  const tab = (['games', 'chat', 'table', 'results', 'tournaments', 'money', 'people'].includes(sp.get('tab') || '') ? sp.get('tab') : 'games') as Tab
   const navigate = useNavigate()
   const { toast } = useToast()
   const places = useAppState()('places', 'places:write')
@@ -79,12 +80,13 @@ export default function Group() {
           <MenuButton label="More" items={menu} align="right" width={260}><Icon name="more" size={18} /></MenuButton>
         </div>
       </header>
-      <Tabs value={tab} onChange={go} tabs={[{ id: 'games', label: 'Games', icon: 'calendar' }, { id: 'chat', label: g.unread ? `Chat (${g.unread})` : 'Chat', icon: 'message' }, { id: 'table', label: 'Table', icon: 'chart' }, { id: 'results', label: 'Results', icon: 'trophy' }, { id: 'tournaments', label: 'Tournaments', icon: 'layers' }, { id: 'people', label: 'People', icon: 'users' }]} />
+      <Tabs value={tab} onChange={go} tabs={[{ id: 'games', label: 'Games', icon: 'calendar' }, { id: 'chat', label: g.unread ? `Chat (${g.unread})` : 'Chat', icon: 'message' }, { id: 'table', label: 'Table', icon: 'chart' }, { id: 'results', label: 'Results', icon: 'trophy' }, { id: 'tournaments', label: 'Tournaments', icon: 'layers' }, { id: 'money', label: 'Money', icon: 'wallet' }, { id: 'people', label: 'People', icon: 'users' }]} />
       {tab === 'games' && <GamesTab d={d} />}
       {tab === 'chat' && <div className="card chat-card"><Chat groupId={gid} organiser={org} aiCatchUp /></div>}
       {tab === 'table' && <TableTab g={g} />}
       {tab === 'results' && <ResultsTab g={g} />}
       {tab === 'tournaments' && <TournamentsTab g={g} />}
+      {tab === 'money' && <MoneyTab g={g} onEditGroup={() => setEditing(true)} />}
       {tab === 'people' && <PeopleTab d={d} reload={load} />}
       {editing && <GroupForm group={g} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load() }} />}
       {leave && <Confirm title={`Leave ${g.name}?`} confirmLabel="Leave" message="You no longer see its games and chat. Your results stay in its table." onCancel={() => setLeave(false)}

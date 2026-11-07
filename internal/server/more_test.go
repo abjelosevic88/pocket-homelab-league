@@ -250,3 +250,51 @@ func TestFindingASub(t *testing.T) {
 		t.Fatalf("offer still open: %v", l)
 	}
 }
+
+func TestWhoOwesWhat(t *testing.T) {
+	a := newApp(t, nil)
+	gid, _ := tennis(a) // the court costs 40 BAM
+	g := "/api/v1/groups/" + gid
+	a.ok(a.alice, "PUT", g, map[string]any{"charge_games": true, "pay_note": "revolut.me/alice"})
+	a.ok(a.alice, "POST", g+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	gm := a.ok(a.alice, "POST", g+"/games", map[string]any{"starts_at": soon(-3), "im_in": true, "duration_min": 60})
+	gameID := int64(num(gm["game"].(map[string]any), "id"))
+	_ = a.st.SetAnswer(context.Background(), gameID, a.ids["Bob"], "in", "")
+	a.ok(a.alice, "POST", "/api/v1/games/"+itoa(gameID)+"/guests", map[string]any{"name": "Mia"})
+	grp, _ := a.st.GroupByID(context.Background(), n(gid))
+	game, _ := a.st.GameByID(context.Background(), gameID)
+	a.s.chargeGame(context.Background(), grp, game)
+	a.s.chargeGame(context.Background(), grp, game) // once only
+	m := a.ok(a.bob, "GET", g+"/money", nil)
+	owes := map[string]float64{}
+	for _, b := range m["balances"].([]any) {
+		bm := b.(map[string]any)
+		owes[bm["name"].(string)] = num(bm, "owes")
+	}
+	// 40 between three (Alice, Bob, Mia): 13.34 each, Mia's on Alice
+	if owes["Bob"] != 1334 || owes["Alice"] != 2668 {
+		t.Fatalf("balances: %v", owes)
+	}
+	if len(m["entries"].([]any)) != 1 || m["pay_note"] != "revolut.me/alice" {
+		t.Fatalf("Bob sees only his own entries: %v", m["entries"])
+	}
+	// Bob says he paid: pending until Alice confirms
+	a.expect(403, a.bob, "POST", g+"/money", map[string]any{"kind": "charge", "user_id": a.ids["Alice"], "amount_cents": 100})
+	r := a.ok(a.bob, "POST", g+"/money", map[string]any{"kind": "payment", "amount_cents": 1334, "note": "cash"})
+	var pid string
+	for _, e := range r["entries"].([]any) {
+		em := e.(map[string]any)
+		if em["kind"] == "payment" {
+			pid = id(em)
+		}
+	}
+	a.expect(403, a.bob, "POST", "/api/v1/money/"+pid+"/confirm", nil)
+	r = a.ok(a.alice, "POST", "/api/v1/money/"+pid+"/confirm", nil)
+	for _, b := range r["balances"].([]any) {
+		bm := b.(map[string]any)
+		if bm["name"] == "Bob" && num(bm, "owes") != 0 {
+			t.Fatalf("after paying: %v", bm)
+		}
+	}
+	a.expect(404, a.bob, "DELETE", "/api/v1/money/999", nil)
+}

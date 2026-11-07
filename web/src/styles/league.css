@@ -613,3 +613,19 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .rel-score.ok { color: var(--ok, #2f9e44); }
 .rel-score.mid { color: var(--warn, #e67700); }
 .rel-score.low { color: var(--danger); }
+
+/* money */
+.money-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.money-big { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.money-big.owe { color: var(--danger); }
+.money-actions { align-items: stretch; }
+.pay-note { display: flex; align-items: center; gap: 12px; }
+.ledger-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.ledger-row:last-child { border-bottom: 0; }
+.money-amt { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money-amt.owe { color: var(--danger); }
+.money-amt.ahead { color: var(--ok, #2f9e44); }
+.money-amt.even { color: var(--muted); font-weight: 500; }
+.ledger-ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); color: var(--text-2); }
+.ledger-ico.payment { background: var(--accent-soft); color: var(--accent-ink); }
+.input-suffix { display: inline-flex; align-items: center; padding: 0 10px; color: var(--muted); font-size: 13px; }

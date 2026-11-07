@@ -946,6 +946,7 @@ func (s *Server) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 	}
 	u := userFrom(ctx)
 	s.store.AddTLog(ctx, t.ID, u.ID, "draw", "")
+	s.chargeTournament(ctx, t, g)
 	s.systemMessage(ctx, g, 0, "tournament", t.Name+" has started — good luck everyone!", map[string]any{"tournament_id": t.ID})
 	s.toGroup(ctx, g.ID, "tournament", map[string]any{"id": t.ID, "group_id": g.ID})
 	es, _ := s.store.Entries(ctx, t.ID)

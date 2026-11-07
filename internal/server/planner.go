@@ -192,6 +192,10 @@ func (s *Server) remind(ctx context.Context, now time.Time) {
 					body: fmt.Sprintf("In %s%s. %d in.", untilWords(until), where, gm.In), link: link})
 			}
 		}
+		// after the game: everyone's share, when the group keeps accounts
+		if now.After(end) && g.ChargeGames && gm.CostCents > 0 && gm.In > 0 && mark("charged") {
+			s.chargeGame(ctx, g, gm)
+		}
 		// after the game: the score, please
 		if now.After(end.Add(20*time.Minute)) && now.Before(end.Add(24*time.Hour)) && gm.Matches == 0 && gm.In > 0 && mark("result") {
 			s.tell(ctx, g, by[store.AnswerIn], 0, note{kind: "results", title: g.Name + ": how did it go?", body: "Add the score, so the table keeps up.", link: link, button: "Add the score"})
