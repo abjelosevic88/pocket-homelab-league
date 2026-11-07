@@ -81,7 +81,7 @@ export default function Group() {
           <MenuButton label="More" items={menu} align="right" width={260}><Icon name="more" size={18} /></MenuButton>
         </div>
       </header>
-      <Tabs value={tab} onChange={go} tabs={[{ id: 'games', label: 'Games', icon: 'calendar' }, { id: 'chat', label: g.unread ? `Chat (${g.unread})` : 'Chat', icon: 'message' }, { id: 'table', label: 'Table', icon: 'chart' }, { id: 'results', label: 'Results', icon: 'trophy' }, { id: 'tournaments', label: 'Tournaments', icon: 'layers' }, { id: 'money', label: 'Money', icon: 'wallet' }, { id: 'people', label: 'People', icon: 'users' }]} />
+      <Tabs value={tab} onChange={go} tabs={[{ id: 'games', label: 'Games', icon: 'calendar' }, { id: 'chat', label: g.unread ? `Chat (${g.unread})` : 'Chat', icon: 'message' }, { id: 'table', label: 'Table', icon: 'chart' }, { id: 'results', label: 'Results', icon: 'trophy' }, { id: 'tournaments', label: 'Tournaments', icon: 'bracket' }, { id: 'money', label: 'Money', icon: 'wallet' }, { id: 'people', label: 'People', icon: 'users' }]} />
       {tab === 'games' && <GamesTab d={d} />}
       {tab === 'chat' && <div className="card chat-card"><Chat groupId={gid} organiser={org} aiCatchUp /></div>}
       {tab === 'table' && <TableTab g={g} />}

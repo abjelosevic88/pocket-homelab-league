@@ -114,7 +114,7 @@ function TournamentView({ d, setD, reload, readOnly = false }: { d: TDetail; set
 
       <Tabs value={tab} onChange={setTab} tabs={[
         { id: 'now', label: t.status === 'signup' ? 'How it works' : 'Now', icon: 'activity' },
-        { id: 'draw', label: t.format === 'ranking' ? 'Leaderboard' : t.format === 'ladder' ? 'Ladder' : 'Draw', icon: 'layers' },
+        { id: 'draw', label: t.format === 'ranking' ? 'Leaderboard' : t.format === 'ladder' ? 'Ladder' : 'Draw', icon: 'bracket' },
         { id: 'entries', label: `Entries (${t.entries})`, icon: 'users' },
         ...(d.can_run && !readOnly ? [{ id: 'log' as Tab, label: 'Record', icon: 'list' }] : []),
       ]} />
@@ -224,7 +224,7 @@ const FORMAT_HELP: Record<string, string> = {
 }
 
 function Draw({ d, setD, onResult, readOnly, reload }: { d: TDetail; setD: (d: TDetail) => void; onResult: (m: TMatch) => void; readOnly: boolean; reload: () => void }) {
-  if (!d.stages.length) return <Empty icon="layers" title="No draw yet">The organisers make it when everyone has signed up.</Empty>
+  if (!d.stages.length) return <Empty icon="bracket" title="No draw yet">The organisers make it when everyone has signed up.</Empty>
   return <div className="stack loose">{d.stages.map(st => <StageView key={st.id} d={d} st={st} setD={setD} onResult={onResult} readOnly={readOnly} reload={reload} />)}</div>
 }
 

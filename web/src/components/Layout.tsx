@@ -37,7 +37,7 @@ export function createItems(onCreate: (k: CreateKind) => void, { player, hasGrou
   return [
     { label: 'Plan a game', icon: 'calendar-plus', hint: 'N', disabled: !hasGroups, onSelect: () => onCreate('game') },
     { label: 'Enter a result', icon: 'trophy', hint: 'R', disabled: !hasGroups, onSelect: () => onCreate('result') },
-    { label: 'New tournament', icon: 'layers', hint: 'T', disabled: !hasGroups, onSelect: () => onCreate('tournament') },
+    { label: 'New tournament', icon: 'bracket', hint: 'T', disabled: !hasGroups, onSelect: () => onCreate('tournament') },
     'sep',
     { label: player ? 'New group (members only)' : 'New group', icon: 'users', hint: 'G', disabled: player, onSelect: () => onCreate('group') },
   ]
@@ -122,8 +122,8 @@ function Shell() {
     { id: 'home', label: 'Home', icon: 'home', hint: 'H', run: () => navigate('/') },
     { id: 'games', label: 'Games', icon: 'calendar', hint: 'P', keywords: 'upcoming next', run: () => navigate('/games') },
     { id: 'results', label: 'Results', icon: 'trophy', hint: 'U', keywords: 'scores matches', run: () => navigate('/results') },
-    { id: 'tournaments', label: 'Tournaments', icon: 'layers', hint: 'T', keywords: 'cup knockout bracket americano ladder', run: () => navigate('/tournaments') },
-    { id: 'tournament', label: 'New tournament', icon: 'layers', keywords: 'cup knockout bracket americano mexicano ladder swiss league', run: () => create('tournament') },
+    { id: 'tournaments', label: 'Tournaments', icon: 'bracket', hint: 'T', keywords: 'cup knockout bracket americano ladder', run: () => navigate('/tournaments') },
+    { id: 'tournament', label: 'New tournament', icon: 'bracket', keywords: 'cup knockout bracket americano mexicano ladder swiss league', run: () => create('tournament') },
     ...live.flatMap(g => [
       { id: `g-${g.id}`, label: g.name, icon: 'users', keywords: `${g.sport_label} group`, run: () => navigate(`/groups/${g.id}`) },
       { id: `t-${g.id}`, label: `${g.name}: the table`, icon: 'chart', keywords: 'standings rating', run: () => navigate(`/groups/${g.id}?tab=table`) },

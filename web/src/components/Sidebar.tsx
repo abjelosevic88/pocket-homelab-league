@@ -21,7 +21,7 @@ export function Sidebar({ onCreate, onNavigate }: { onCreate: (k: CreateKind) =>
   const nav = [
     { to: '/', label: 'Home', icon: 'home', active: loc.pathname === '/' },
     { to: '/games', label: 'Games', icon: 'calendar', active: loc.pathname.startsWith('/games') },
-    { to: '/tournaments', label: 'Tournaments', icon: 'layers', active: loc.pathname.startsWith('/tournaments') },
+    { to: '/tournaments', label: 'Tournaments', icon: 'bracket', active: loc.pathname.startsWith('/tournaments') },
     { to: '/results', label: 'Results', icon: 'trophy', active: loc.pathname === '/results' },
   ]
   const live = (groups || []).filter(g => !g.archived)
