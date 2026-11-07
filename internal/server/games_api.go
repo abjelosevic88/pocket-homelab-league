@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -183,6 +184,7 @@ func (s *Server) gameDetail(ctx context.Context, gm *store.Game, g *store.Group)
 		"mvp":      map[string]any{"mine": votes[uid], "tally": tally, "open": len(matches) > 0 || item[0].Ended},
 		"can_edit": canEditGame(gm, g, uid), "made": made, "share_cost": shareCost(gm),
 	}
+	out["venues"], _ = s.store.Venues(ctx, g.ID)
 	return out
 }
 
@@ -196,22 +198,22 @@ func shareCost(gm *store.Game) int64 {
 
 // gameInput is what a person may set on a game (nil = not sent).
 type gameInput struct {
-	StartsAt     *string  `json:"starts_at"`
-	DurationMin  *int     `json:"duration_min"`
-	Title        *string  `json:"title"`
-	Notes        *string  `json:"notes"`
-	VenueName    *string  `json:"venue_name"`
-	VenueAddress *string  `json:"venue_address"`
-	VenueLat     *float64 `json:"venue_lat"`
-	VenueLon     *float64 `json:"venue_lon"`
-	MinPlayers   *int     `json:"min_players"`
-	MaxPlayers   *int     `json:"max_players"`
-	CostCents    *int64   `json:"cost_cents"`
-	Currency     *string  `json:"currency"`
-	VoteUntil    *string  `json:"vote_until"`
-	Options      []string `json:"options"` // times to vote on
-	ImIn         bool     `json:"im_in"`
-	BookingTask  *bool    `json:"booking_task"`
+	StartsAt     *string    `json:"starts_at"`
+	DurationMin  *int       `json:"duration_min"`
+	Title        *string    `json:"title"`
+	Notes        *string    `json:"notes"`
+	VenueName    *string    `json:"venue_name"`
+	VenueAddress *string    `json:"venue_address"`
+	VenueLat     *float64   `json:"venue_lat"`
+	VenueLon     *float64   `json:"venue_lon"`
+	MinPlayers   *int       `json:"min_players"`
+	MaxPlayers   *int       `json:"max_players"`
+	CostCents    *int64     `json:"cost_cents"`
+	Currency     *string    `json:"currency"`
+	VoteUntil    *string    `json:"vote_until"`
+	Options      []optionIn `json:"options"` // times (and places) to vote on
+	ImIn         bool       `json:"im_in"`
+	BookingTask  *bool      `json:"booking_task"`
 }
 
 func (in gameInput) apply(gm *store.Game, keys map[string]bool) string {
@@ -275,26 +277,93 @@ func (in gameInput) apply(gm *store.Game, keys map[string]bool) string {
 	return ""
 }
 
-// cleanOptions keeps the valid, future, distinct times, in order.
-func cleanOptions(in []string) ([]string, string) {
+// optionIn is a time to vote on — "2026-11-10T20:00" — or a time at a
+// place: {"starts_at": …, "venue_name": "Mojmilo", "venue_address": …}.
+type optionIn store.OptionIn
+
+func (o *optionIn) UnmarshalJSON(b []byte) error {
+	var t string
+	if err := json.Unmarshal(b, &t); err == nil {
+		*o = optionIn{StartsAt: t}
+		return nil
+	}
+	var x store.OptionIn
+	if err := json.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	*o = optionIn(x)
+	return nil
+}
+
+// cleanOptions keeps the valid, distinct options (a time, or a time at a
+// place), in order.
+func cleanOptions(in []optionIn) ([]store.OptionIn, string) {
 	seen := map[string]bool{}
-	out := []string{}
-	for _, t := range in {
-		t = strings.TrimSpace(t)
-		if t == "" || seen[t] {
+	out := []store.OptionIn{}
+	for _, x := range in {
+		o := store.OptionIn(x)
+		o.StartsAt = strings.TrimSpace(o.StartsAt)
+		o.VenueName, o.VenueAddress = clip(strings.TrimSpace(o.VenueName), 120), clip(strings.TrimSpace(o.VenueAddress), 300)
+		if o.StartsAt == "" || seen[o.Key()] {
 			continue
 		}
-		if !validTS(t) {
+		if !validTS(o.StartsAt) {
 			return nil, "every time to vote on is a date and a time"
 		}
-		seen[t] = true
-		out = append(out, t)
+		if (o.VenueLat == nil) != (o.VenueLon == nil) || o.VenueName == "" {
+			o.VenueLat, o.VenueLon = nil, nil
+		}
+		seen[o.Key()] = true
+		out = append(out, o)
 	}
 	if len(out) > 12 {
-		return nil, "offer at most 12 times"
+		return nil, "offer at most 12 times and places"
 	}
-	sort.Strings(out)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].StartsAt != out[j].StartsAt {
+			return out[i].StartsAt < out[j].StartsAt
+		}
+		return out[i].VenueName < out[j].VenueName
+	})
 	return out, ""
+}
+
+// fillVenues completes places given by name only from the group's list
+// (the address and the position for the weather and the map).
+func (s *Server) fillVenues(ctx context.Context, gid int64, gm *store.Game, opts []store.OptionIn) {
+	vs, _ := s.store.Venues(ctx, gid)
+	find := func(name string) *store.Venue {
+		for i := range vs {
+			if strings.EqualFold(vs[i].Name, strings.TrimSpace(name)) {
+				return &vs[i]
+			}
+		}
+		return nil
+	}
+	if gm != nil && gm.VenueName != "" && gm.VenueAddress == "" && gm.VenueLat == nil {
+		if v := find(gm.VenueName); v != nil {
+			gm.VenueAddress, gm.VenueLat, gm.VenueLon = v.Address, v.Lat, v.Lon
+		}
+	}
+	for i := range opts {
+		if opts[i].VenueName != "" && opts[i].VenueAddress == "" && opts[i].VenueLat == nil {
+			if v := find(opts[i].VenueName); v != nil {
+				opts[i].VenueAddress, opts[i].VenueLat, opts[i].VenueLon = v.Address, v.Lat, v.Lon
+			}
+		}
+	}
+}
+
+// rememberVenues keeps the places a game uses in its group's list.
+func (s *Server) rememberVenues(ctx context.Context, gid int64, gm *store.Game, opts []store.OptionIn) {
+	if gm != nil && gm.VenueName != "" {
+		_ = s.store.EnsureVenue(ctx, gid, store.Venue{Name: gm.VenueName, Address: gm.VenueAddress, Lat: gm.VenueLat, Lon: gm.VenueLon})
+	}
+	for _, o := range opts {
+		if o.VenueName != "" {
+			_ = s.store.EnsureVenue(ctx, gid, store.Venue{Name: o.VenueName, Address: o.VenueAddress, Lat: o.VenueLat, Lon: o.VenueLon})
+		}
+	}
 }
 
 func (s *Server) handleCreateGame(w http.ResponseWriter, r *http.Request) {
@@ -321,11 +390,18 @@ func (s *Server) handleCreateGame(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
+	if keys["venue_name"] && !keys["venue_address"] && !keys["venue_lat"] && !strings.EqualFold(gm.VenueName, g.VenueName) {
+		gm.VenueAddress, gm.VenueLat, gm.VenueLon = "", nil, nil
+	}
+	s.fillVenues(ctx, g.ID, gm, opts)
 	switch {
 	case len(opts) >= 2:
 		gm.Status, gm.StartsAt = store.GameVoting, ""
 	case len(opts) == 1:
-		gm.StartsAt = opts[0]
+		gm.StartsAt = opts[0].StartsAt
+		if opts[0].VenueName != "" {
+			gm.VenueName, gm.VenueAddress, gm.VenueLat, gm.VenueLon = opts[0].VenueName, opts[0].VenueAddress, opts[0].VenueLat, opts[0].VenueLon
+		}
 	}
 	if gm.Status == store.GamePlanned && gm.StartsAt == "" {
 		writeErr(w, http.StatusBadRequest, "say when the game is, or offer a few times to vote on")
@@ -341,6 +417,7 @@ func (s *Server) handleCreateGame(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	s.rememberVenues(ctx, g.ID, gm, opts)
 	if in.ImIn && gm.Status == store.GamePlanned {
 		_ = s.store.SetAnswer(ctx, gm.ID, u.ID, store.AnswerIn, "")
 	}
@@ -374,6 +451,10 @@ func (s *Server) announceGame(ctx context.Context, g *store.Group, gm *store.Gam
 		if gm.Status == store.GameVoting {
 			text = who + " wants to find a time for the next game — vote on the times that suit you"
 			title, body, topic = g.Name+": when can you play?", who+" offered a few times for the next game. Say which suit you.", "league.vote_started"
+			if places := s.optionPlaces(ctx, gm.ID); len(places) > 1 {
+				text = who + " wants to find a time and a place for the next game (" + strings.Join(places, " or ") + ") — vote on what suits you"
+				title, body = g.Name+": when and where?", who+" offered a few times at "+strings.Join(places, " or ")+". Say which suit you."
+			}
 		} else {
 			text = who + " planned a game: " + whenText(gm.StartsAt) + at
 			if gm.Auto {
@@ -424,6 +505,10 @@ func (s *Server) handleUpdateGame(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
+	if keys["venue_name"] && !keys["venue_address"] && !keys["venue_lat"] && before.VenueName != gm.VenueName {
+		gm.VenueAddress, gm.VenueLat, gm.VenueLon = "", nil, nil
+	}
+	s.fillVenues(ctx, g.ID, gm, nil)
 	if gm.Status == store.GamePlanned && gm.StartsAt == "" {
 		writeErr(w, http.StatusBadRequest, "a planned game needs a time")
 		return
@@ -434,15 +519,18 @@ func (s *Server) handleUpdateGame(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, firstNonEmpty(msg, "offer at least two times"))
 			return
 		}
+		s.fillVenues(ctx, g.ID, nil, opts)
 		if err := s.store.SetOptions(ctx, gm.ID, opts); err != nil {
 			s.fail(w, err, "times")
 			return
 		}
+		s.rememberVenues(ctx, g.ID, nil, opts)
 	}
 	if err := s.store.UpdateGame(ctx, gm); err != nil {
 		s.fail(w, err, "save game")
 		return
 	}
+	s.rememberVenues(ctx, g.ID, gm, nil)
 	moved := gm.Status == store.GamePlanned && (before.StartsAt != gm.StartsAt || before.VenueName != gm.VenueName)
 	if before.StartsAt != gm.StartsAt {
 		_ = s.store.ClearSent(ctx, gm.ID)
@@ -719,6 +807,9 @@ func (s *Server) pickTime(ctx context.Context, g *store.Group, gm *store.Game, o
 		return store.ErrNotFound
 	}
 	gm.Status, gm.StartsAt = store.GamePlanned, pick.StartsAt
+	if pick.VenueName != "" {
+		gm.VenueName, gm.VenueAddress, gm.VenueLat, gm.VenueLon = pick.VenueName, pick.VenueAddress, pick.VenueLat, pick.VenueLon
+	}
 	if err := s.store.UpdateGame(ctx, gm); err != nil {
 		return err
 	}
@@ -738,6 +829,20 @@ func (s *Server) pickTime(ctx context.Context, g *store.Group, gm *store.Game, o
 	s.announceGame(ctx, g, gm, by, "planned")
 	s.syncCalendarLater(gm.ID, false)
 	return nil
+}
+
+// optionPlaces are the different places offered in a vote.
+func (s *Server) optionPlaces(ctx context.Context, gameID int64) []string {
+	opts, _ := s.store.Options(ctx, gameID)
+	seen := map[string]bool{}
+	out := []string{}
+	for _, o := range opts {
+		if o.VenueName != "" && !seen[strings.ToLower(o.VenueName)] {
+			seen[strings.ToLower(o.VenueName)] = true
+			out = append(out, o.VenueName)
+		}
+	}
+	return out
 }
 
 // bestOption is the time most people can make (yes counts more than maybe).

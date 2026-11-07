@@ -88,6 +88,10 @@ func (s *Server) Router() http.Handler {
 				r.Delete("/groups/{id}/members/{uid}", s.handleRemoveMember)
 				r.Post("/groups/{id}/members/{uid}/link", s.handleMemberLink)
 				r.Post("/groups/{id}/venue/save", s.handleSaveVenue)
+				r.Get("/groups/{id}/venues", s.handleVenues)
+				r.Post("/groups/{id}/venues", s.handleAddVenue)
+				r.Put("/groups/{id}/venues/{vid}", s.handleUpdateVenue)
+				r.Delete("/groups/{id}/venues/{vid}", s.handleDeleteVenue)
 
 				// games
 				r.Get("/games", s.handleListGames)

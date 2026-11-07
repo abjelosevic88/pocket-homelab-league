@@ -93,7 +93,13 @@ func (s *Server) seedDemo(ctx context.Context, owner int64) error {
 	if err != nil {
 		return err
 	}
-	// owner is in every group (CreateGroup made them organiser)
+	// owner is in every group (CreateGroup made them organiser); the places they play at
+	for _, g := range []*store.Group{tennis, football, padel} {
+		_ = s.store.EnsureVenue(ctx, g.ID, store.Venue{Name: g.VenueName, Address: g.VenueAddress, Lat: g.VenueLat, Lon: g.VenueLon})
+	}
+	zLat, zLon := 43.8563, 18.4131
+	_ = s.store.EnsureVenue(ctx, tennis.ID, store.Venue{Name: "TK Zetra (indoor)", Address: "Alipašina, Sarajevo", Lat: &zLat, Lon: &zLon})
+	_ = s.store.EnsureVenue(ctx, football.ID, store.Venue{Name: "Teren Ciglane", Address: "Ciglane, Sarajevo"})
 
 	weekday := func(wd int, weeksAgo int, hm string) string {
 		d := now.AddDate(0, 0, -7*weeksAgo)
@@ -332,10 +338,14 @@ func (s *Server) seedDemo(ctx context.Context, owner int64) error {
 	pg := &store.Game{GroupID: padel.ID, Status: store.GameVoting, DurationMin: 90, VenueName: padel.VenueName, VenueAddress: padel.VenueAddress, MinPlayers: 4, MaxPlayers: 4,
 		CostCents: 6000, Currency: "BAM", VoteUntil: now.AddDate(0, 0, 2).Format("2006-01-02") + "T12:00"}
 	_ = s.store.CreateGame(ctx, ids[1], pg)
-	var opts []string
-	for _, d := range []int{3, 4, 6} {
-		opts = append(opts, now.AddDate(0, 0, d).Format("2006-01-02")+"T18:30")
+	// a time and a place: Stup on two evenings, or the new courts at Grbavica
+	grb, grbLat, grbLon := "Padel Arena Grbavica", 43.8519, 18.3897
+	opts := []store.OptionIn{
+		{StartsAt: now.AddDate(0, 0, 3).Format("2006-01-02") + "T18:30", VenueName: padel.VenueName, VenueAddress: padel.VenueAddress},
+		{StartsAt: now.AddDate(0, 0, 4).Format("2006-01-02") + "T19:00", VenueName: grb, VenueAddress: "Grbavička, Sarajevo", VenueLat: &grbLat, VenueLon: &grbLon},
+		{StartsAt: now.AddDate(0, 0, 6).Format("2006-01-02") + "T18:30", VenueName: padel.VenueName, VenueAddress: padel.VenueAddress},
 	}
+	s.rememberVenues(ctx, padel.ID, nil, opts)
 	_ = s.store.SetOptions(ctx, pg.ID, opts)
 	if os, err := s.store.Options(ctx, pg.ID); err == nil && len(os) == 3 {
 		_ = s.store.SetVotes(ctx, pg.ID, ids[1], map[int64]string{os[0].ID: "yes", os[1].ID: "maybe", os[2].ID: "yes"})

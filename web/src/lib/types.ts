@@ -56,7 +56,8 @@ export interface Member {
 }
 
 export interface Person { user_id: number; name: string; answer: AnswerKind; side: '' | 'a' | 'b'; note: string; answered_at: string; rating: number }
-export interface Option { id: number; game_id: number; starts_at: string; votes: Record<string, 'yes' | 'maybe' | 'no'> }
+export interface Option { id: number; game_id: number; starts_at: string; venue_name: string; venue_address: string; venue_lat: number | null; venue_lon: number | null; votes: Record<string, 'yes' | 'maybe' | 'no'> }
+export interface Venue { id: number; group_id: number; name: string; address: string; lat: number | null; lon: number | null; ref: string }
 
 export interface Score { sets?: [number, number][]; a?: number; b?: number }
 export interface MatchPlayer { user_id: number; side: '' | 'a' | 'b'; score: number | null; place: number }
@@ -69,7 +70,7 @@ export interface Match {
 export interface Made { id: number; group_id: number; game_id: number; match_id: number; app: string; ref: string; url: string; title: string; detail: string; created_at: string }
 
 export interface GameDetail {
-  game: Game; group: Group; people: Person[]; options: Option[]; matches: Match[]
+  game: Game; group: Group; people: Person[]; options: Option[]; matches: Match[]; venues: Venue[]
   mvp: { mine: number; tally: Record<string, number>; open: boolean }; can_edit: boolean; made: Made[]; share_cost: number; result?: string; rating_gap?: number
 }
 

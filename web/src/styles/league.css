@@ -473,3 +473,15 @@ a.list-row:hover, .list-row:has(> a.row-main:hover) { background: var(--hover); 
 /* table cells hidden on phones stay cells elsewhere */
 td.hide-sm, th.hide-sm { display: table-cell; }
 @media (max-width: 767px) { td.hide-sm, th.hide-sm { display: none; } }
+
+/* places */
+.place-chips { gap: 6px; }
+.chip-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.chip-btn:hover { border-color: var(--border-strong); }
+.chip-btn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.opt-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.opt-venue { display: flex; align-items: center; gap: 4px; color: var(--text-2); margin-top: 1px; }
+.venue-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; }
+.venue-row .badge { margin-left: 6px; }
+@media (max-width: 640px) { .opt-in { grid-template-columns: 1fr auto; } .opt-in .opt-place { grid-column: 1; } }
+.venues-edit { margin-top: 6px; }

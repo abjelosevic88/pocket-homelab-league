@@ -238,9 +238,9 @@ func (s *Store) SetSides(ctx context.Context, gameID int64, sides map[int64]stri
 
 // ---- finding a time ----
 
-// Options lists the times offered for a game with everyone's votes.
+// Options lists the times (and places) offered for a game with everyone's votes.
 func (s *Store) Options(ctx context.Context, gameID int64) ([]*Option, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, game_id, starts_at FROM options WHERE game_id = ? ORDER BY starts_at`, gameID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, game_id, starts_at, venue_name, venue_address, venue_lat, venue_lon FROM options WHERE game_id = ? ORDER BY starts_at, venue_name`, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (s *Store) Options(ctx context.Context, gameID int64) ([]*Option, error) {
 	byID := map[int64]*Option{}
 	for rows.Next() {
 		o := &Option{Votes: map[string]string{}}
-		if err := rows.Scan(&o.ID, &o.GameID, &o.StartsAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.GameID, &o.StartsAt, &o.VenueName, &o.VenueAddress, &o.VenueLat, &o.VenueLon); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -274,33 +274,36 @@ func (s *Store) Options(ctx context.Context, gameID int64) ([]*Option, error) {
 	return out, vr.Err()
 }
 
-// SetOptions replaces the times offered (votes on times kept stay).
-func (s *Store) SetOptions(ctx context.Context, gameID int64, times []string) error {
+// SetOptions replaces the times and places offered; an option kept (same
+// time, same place) keeps its votes.
+func (s *Store) SetOptions(ctx context.Context, gameID int64, opts []OptionIn) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	keep := map[string]bool{}
-	for _, t := range times {
-		keep[t] = true
-		if _, err := tx.ExecContext(ctx, `INSERT INTO options (game_id, starts_at) VALUES (?, ?) ON CONFLICT DO NOTHING`, gameID, t); err != nil {
+	for _, o := range opts {
+		keep[o.Key()] = true
+		if _, err := tx.ExecContext(ctx, `INSERT INTO options (game_id, starts_at, venue_name, venue_address, venue_lat, venue_lon) VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(game_id, starts_at, venue_name) DO UPDATE SET venue_address = excluded.venue_address, venue_lat = excluded.venue_lat, venue_lon = excluded.venue_lon`,
+			gameID, o.StartsAt, strings.TrimSpace(o.VenueName), o.VenueAddress, nullF(o.VenueLat), nullF(o.VenueLon)); err != nil {
 			return err
 		}
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id, starts_at FROM options WHERE game_id = ?`, gameID)
+	rows, err := tx.QueryContext(ctx, `SELECT id, starts_at, venue_name FROM options WHERE game_id = ?`, gameID)
 	if err != nil {
 		return err
 	}
 	var drop []int64
 	for rows.Next() {
 		var id int64
-		var t string
-		if err := rows.Scan(&id, &t); err != nil {
+		var t, v string
+		if err := rows.Scan(&id, &t, &v); err != nil {
 			rows.Close()
 			return err
 		}
-		if !keep[t] {
+		if !keep[OptionIn{StartsAt: t, VenueName: v}.Key()] {
 			drop = append(drop, id)
 		}
 	}

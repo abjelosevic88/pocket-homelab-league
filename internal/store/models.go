@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 // Roles.
@@ -177,10 +178,28 @@ type Answer struct {
 
 // Option is a time offered while finding one.
 type Option struct {
-	ID       int64             `json:"id"`
-	GameID   int64             `json:"game_id"`
-	StartsAt string            `json:"starts_at"`
-	Votes    map[string]string `json:"votes"` // user id → yes | maybe | no
+	ID           int64             `json:"id"`
+	GameID       int64             `json:"game_id"`
+	StartsAt     string            `json:"starts_at"`
+	VenueName    string            `json:"venue_name"` // "" = the game's own place
+	VenueAddress string            `json:"venue_address"`
+	VenueLat     *float64          `json:"venue_lat"`
+	VenueLon     *float64          `json:"venue_lon"`
+	Votes        map[string]string `json:"votes"` // user id → yes | maybe | no
+}
+
+// OptionIn is a time (and maybe a place) offered for a vote.
+type OptionIn struct {
+	StartsAt     string   `json:"starts_at"`
+	VenueName    string   `json:"venue_name"`
+	VenueAddress string   `json:"venue_address"`
+	VenueLat     *float64 `json:"venue_lat"`
+	VenueLon     *float64 `json:"venue_lon"`
+}
+
+// Key is what makes two options the same: the time and the place.
+func (o OptionIn) Key() string {
+	return o.StartsAt + "|" + strings.ToLower(strings.TrimSpace(o.VenueName))
 }
 
 // Match is a result.

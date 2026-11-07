@@ -76,6 +76,7 @@ type exportGroup struct {
 	Games    []exportGame    `json:"games"`
 	Matches  []exportMatch   `json:"matches"`
 	Messages []exportMessage `json:"messages"`
+	Venues   []store.Venue   `json:"venues"`
 }
 
 func personKey(m *store.Member) string {
@@ -94,6 +95,7 @@ func (s *Server) export(ctx context.Context, uid int64) exportDoc {
 	for _, g := range gs {
 		eg := exportGroup{Key: firstNonEmpty(s.importKeyOf(ctx, g), fmt.Sprintf("league:group:%d", g.ID)), Group: g,
 			People: []exportPerson{}, Games: []exportGame{}, Matches: []exportMatch{}, Messages: []exportMessage{}}
+		eg.Venues, _ = s.store.Venues(ctx, g.ID)
 		ms, _ := s.store.Members(ctx, g.ID)
 		keys := map[int64]string{}
 		for _, m := range ms {
@@ -281,6 +283,9 @@ func (s *Server) importDoc(ctx context.Context, me *store.User, doc exportDoc) m
 				res["skipped"]++
 				continue
 			}
+		}
+		for _, v := range eg.Venues {
+			_ = s.store.EnsureVenue(ctx, g.ID, store.Venue{Name: v.Name, Address: v.Address, Lat: v.Lat, Lon: v.Lon})
 		}
 		people := map[string]int64{}
 		for _, p := range eg.People {

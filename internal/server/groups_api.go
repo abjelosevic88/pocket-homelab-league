@@ -294,6 +294,7 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "create group")
 		return
 	}
+	_ = s.store.EnsureVenue(ctx, g.ID, store.Venue{Name: g.VenueName, Address: g.VenueAddress, Lat: g.VenueLat, Lon: g.VenueLon, Ref: g.VenueRef})
 	g, _ = s.store.GetGroup(ctx, u.ID, g.ID)
 	writeJSON(w, http.StatusCreated, viewGroup(g))
 }
@@ -317,8 +318,9 @@ func (s *Server) handleGetGroup(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	venues, _ := s.store.Venues(ctx, g.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"group": v, "members": s.memberViews(ctx, g, ms), "upcoming": upcoming,
-		"feed_url": s.feedURL(r, g.ID)})
+		"feed_url": s.feedURL(r, g.ID), "venues": venues})
 }
 
 func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
@@ -341,6 +343,7 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "save group")
 		return
 	}
+	_ = s.store.EnsureVenue(ctx, g.ID, store.Venue{Name: g.VenueName, Address: g.VenueAddress, Lat: g.VenueLat, Lon: g.VenueLon, Ref: g.VenueRef})
 	g, _ = s.store.GetGroup(ctx, actorID(ctx), g.ID)
 	s.toGroup(ctx, g.ID, "group", map[string]any{"id": g.ID})
 	writeJSON(w, http.StatusOK, viewGroup(g))

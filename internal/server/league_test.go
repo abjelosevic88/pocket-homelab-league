@@ -222,3 +222,52 @@ func TestPublishesOnlyLeagueEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestVotingOnTimesAndPlaces(t *testing.T) {
+	a := newApp(t, nil)
+	gid, _ := tennis(a)
+	g := "/api/v1/groups/" + gid
+	a.ok(a.alice, "POST", g+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	// a place used once is remembered; the group's own one is there from the start
+	vs := a.list(a.alice, g+"/venues")
+	if len(vs) != 1 || vs[0].(map[string]any)["name"] != "TK Koševo" {
+		t.Fatalf("venues: %v", vs)
+	}
+	a.expect(403, a.bob, "POST", g+"/venues", map[string]any{"name": "Mine"})
+	a.ok(a.alice, "POST", g+"/venues", map[string]any{"name": "TK Zetra", "address": "Alipašina"})
+	// the same evening at two places, and another evening: three options (a bare time still works)
+	d := a.ok(a.bob, "POST", g+"/games", map[string]any{"options": []any{
+		map[string]any{"starts_at": "2030-05-07T20:00", "venue_name": "TK Koševo"},
+		map[string]any{"starts_at": "2030-05-07T20:00", "venue_name": "TK Zetra"},
+		"2030-05-08T19:00",
+	}})
+	game := d["game"].(map[string]any)
+	opts := d["options"].([]any)
+	if game["status"] != "voting" || len(opts) != 3 {
+		t.Fatalf("vote: %v %v", game["status"], opts)
+	}
+	var zetra string
+	for _, o := range opts {
+		if o.(map[string]any)["venue_name"] == "TK Zetra" {
+			zetra = id(o.(map[string]any))
+		}
+	}
+	a.ok(a.alice, "POST", "/api/v1/games/"+id(game)+"/votes", map[string]any{"votes": map[string]string{zetra: "yes"}})
+	p := a.ok(a.bob, "POST", "/api/v1/games/"+id(game)+"/pick", map[string]any{"option_id": n(zetra)})
+	pg := p["game"].(map[string]any)
+	if pg["status"] != "planned" || pg["starts_at"] != "2030-05-07T20:00" || pg["venue_name"] != "TK Zetra" || pg["venue_address"] != "Alipašina" {
+		t.Fatalf("picked: %v", pg)
+	}
+	if got := a.st.GetAnswer(context.Background(), n(id(pg)), a.ids["Alice"]); got != store.AnswerIn {
+		t.Fatalf("a yes for the picked option is in: %q", got)
+	}
+	// the default place can't be removed; another can
+	for _, v := range a.list(a.alice, g+"/venues") {
+		m := v.(map[string]any)
+		want := 204
+		if m["name"] == "TK Koševo" {
+			want = 400
+		}
+		a.expect(want, a.alice, "DELETE", g+"/venues/"+id(m), nil)
+	}
+}

@@ -6,7 +6,7 @@ import { useApp } from '../lib/app-context'
 import { announceChange, useAppState, useLiveEvents, useOnChange } from '../lib/data'
 import { fmtDate, fmtDateTime } from '../lib/format'
 import { WEEKDAYS, money, when } from '../lib/league'
-import type { Game, Group as GroupT, Match, Member, Row } from '../lib/types'
+import type { Game, Group as GroupT, Match, Member, Row, Venue } from '../lib/types'
 import { cap, FormDots, GameCard, MatchRow } from '../components/Bits'
 import { Chat } from '../components/Chat'
 import { GroupForm } from '../components/GroupForm'
@@ -17,7 +17,7 @@ import { ResultForm } from '../components/ResultForm'
 import { Avatar, Confirm, Empty, Loading, type MenuItem, MenuButton, Segmented, Tabs, useToast } from '../components/ui'
 
 type Tab = 'games' | 'chat' | 'table' | 'results' | 'people'
-interface Detail { group: GroupT; members: Member[]; upcoming: Game[]; feed_url: string }
+interface Detail { group: GroupT; members: Member[]; upcoming: Game[]; feed_url: string; venues: Venue[] }
 
 export default function Group() {
   const { id } = useParams()
@@ -66,7 +66,7 @@ export default function Group() {
           <p className="muted small group-facts">
             <span>{g.sport_label}</span>
             {usual && <span><Icon name="repeat" size={12} /> {usual}</span>}
-            {g.venue_name && <span><Icon name="pin" size={12} /> {g.venue_name}</span>}
+            {g.venue_name && <span title={d.venues.map(v => v.name).join(', ')}><Icon name="pin" size={12} /> {g.venue_name}{d.venues.length > 1 ? ` +${d.venues.length - 1}` : ''}</span>}
             <span><Icon name="users" size={12} /> {g.members}</span>
             {g.cost_cents > 0 && <span><Icon name="wallet" size={12} /> {money(g.cost_cents, g.currency)} a game</span>}
           </p>

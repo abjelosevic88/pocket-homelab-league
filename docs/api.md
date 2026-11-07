@@ -15,6 +15,7 @@ JSON over HTTP at `/api/v1`. Authenticate with the session cookie, or `Authoriza
 | `POST /groups/{id}/members/{uid}/link` | A new one-time sign-in link for a player `{"email":true}` → `{url, text, whatsapp, sms, mailto, emailed}` |
 | `POST /groups/{id}/invite-all` | Email a link to every player who hasn't come in |
 | `POST /groups/{id}/import-players` | A CSV (name, email, phone) |
+| `GET /groups/{id}/venues` · `POST` · `PUT /groups/{id}/venues/{vid}` · `DELETE` | The places a group plays at (organisers change them; `{"default":true}` makes one the group's own); a place used for a game is added by itself |
 | `GET /groups/{id}/table?period=all|year|season|month` | The table with ratings and form |
 | `GET /groups/{id}/players/{uid}` | A player's line, rating over time, head-to-head and last matches |
 
@@ -23,10 +24,10 @@ JSON over HTTP at `/api/v1`. Authenticate with the session cookie, or `Authoriza
 | | |
 |---|---|
 | `GET /upcoming` · `GET /games?group=&upcoming=1|past=1&from=&to=` | Games |
-| `POST /groups/{id}/games` | Plan one `{"starts_at":"2026-11-10T20:00", "im_in":true}` or offer times `{"options":[…], "vote_until":…}` |
+| `POST /groups/{id}/games` | Plan one `{"starts_at":"2026-11-10T20:00", "venue_name":…, "im_in":true}` or offer times and places `{"options":["2026-11-10T20:00", {"starts_at":…, "venue_name":"Mojmilo"}], "vote_until":…}` — a place given by name takes its saved address and position |
 | `GET /games/{id}` · `PUT` · `DELETE` | A game with who's in, the times, results, player of the game |
 | `POST /games/{id}/answer` | `{"answer":"in|maybe|out|"}` (organisers: `"user_id"`) |
-| `POST /games/{id}/votes` · `/pick` | Vote `{"votes":{"<option id>":"yes|maybe|no"}}` · pick a time `{"option_id"}` |
+| `POST /games/{id}/votes` · `/pick` | Vote `{"votes":{"<option id>":"yes|maybe|no"}}` · pick a time (and its place) `{"option_id"}` |
 | `POST /games/{id}/teams` | `{"mode":"fair|shuffle|clear|set", "sides":{…}}` |
 | `POST /games/{id}/mvp` | `{"for": <user id>}` |
 | `POST /games/{id}/cancel` | `{"reason"}` or `{"undo":true}` |

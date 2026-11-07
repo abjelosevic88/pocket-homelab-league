@@ -5,7 +5,7 @@ import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { announceChange, useAppState, useData } from '../lib/data'
 import { CURRENCIES, FORMAT_WORDS, SCORING_WORDS, WEEKDAYS } from '../lib/league'
-import type { Format, Group, Scoring, Sport } from '../lib/types'
+import type { Format, Group, Scoring, Sport, Venue } from '../lib/types'
 import { offTitle } from './Apps'
 import { Icon } from './icons'
 import { Select } from './Select'
@@ -106,6 +106,7 @@ export function GroupForm({ group, onClose, onSaved }: { group?: Group; onClose:
             <Field label="Address"><input value={f.venue_address} onChange={e => set({ venue_address: e.target.value })} maxLength={300} /></Field>
           </div>
           <label className="check-row"><Switch checked={f.outdoor} onChange={v => set({ outdoor: v })} label="Outdoors" /> Outdoors — show the weather for each game</label>
+          {group && <GroupVenues group={group} onDefault={v => set({ venue_name: v.name, venue_address: v.address, venue_lat: v.lat, venue_lon: v.lon, venue_ref: v.ref })} />}
         </div>
 
         <div className="form-sec">
@@ -155,6 +156,45 @@ export function GroupForm({ group, onClose, onSaved }: { group?: Group; onClose:
       </form>
       {del && group && <Confirm title={`Delete ${group.name}?`} confirmLabel="Delete for everyone" message="The games, results, table and chat go for everyone in it. Archive it instead to keep the results." onCancel={() => setDel(false)} onConfirm={remove} />}
     </Modal>
+  )
+}
+
+/** The other places a group plays at: picked from when planning, and
+ * offered in votes. The group's own venue is the default. */
+function GroupVenues({ group, onDefault }: { group: Group; onDefault: (v: Venue) => void }) {
+  const { toast } = useToast()
+  const [list, setList] = useState<Venue[] | null>(null)
+  const [add, setAdd] = useState<{ name: string; address: string; lat: number | null; lon: number | null; ref: string } | null>(null)
+  const load = () => api.get<Venue[]>(`${V1}/groups/${group.id}/venues`).then(setList).catch(() => setList([]))
+  useEffect(() => { load() }, [group.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const save = async () => {
+    if (!add?.name.trim()) return
+    try { setList(await api.post<Venue[]>(`${V1}/groups/${group.id}/venues`, add)); setAdd(null) } catch (e) { toast((e as Error).message, 'err') }
+  }
+  const remove = async (v: Venue) => { try { await api.del(`${V1}/groups/${group.id}/venues/${v.id}`); load() } catch (e) { toast((e as Error).message, 'err') } }
+  const isDefault = (v: Venue) => v.name.toLowerCase() === group.venue_name.toLowerCase()
+  if (!list) return null
+  return (
+    <div className="stack tight venues-edit">
+      <h4 className="form-sec-h">Other places you play</h4>
+      {list.length === 0 && <p className="muted small">None yet. Places used for a game are added by themselves.</p>}
+      {list.map(v => (
+        <div key={v.id} className="venue-row">
+          <Icon name="pin" size={14} />
+          <span className="grow min0"><span className="block-line ellipsis">{v.name}{isDefault(v) && <span className="badge accent">default</span>}</span>{v.address && <span className="muted small ellipsis block-line">{v.address}</span>}</span>
+          {!isDefault(v) && <button type="button" className="btn ghost sm" onClick={() => onDefault(v)} title="Make it the group's own place (save to keep)">Make default</button>}
+          {!isDefault(v) && <button type="button" className="btn ghost icon-only sm" aria-label={`Remove ${v.name}`} onClick={() => remove(v)}><Icon name="x" size={14} /></button>}
+        </div>
+      ))}
+      {add ? <div className="stack tight">
+        <VenuePicker value={{ venue_name: add.name }} onPick={p => setAdd({ name: p.venue_name, address: p.venue_address, lat: p.venue_lat, lon: p.venue_lon, ref: p.venue_ref })} />
+        <div className="two-col tight">
+          <input value={add.name} onChange={e => setAdd({ ...add, name: e.target.value })} placeholder="Name" aria-label="Place name" maxLength={120} autoFocus />
+          <input value={add.address} onChange={e => setAdd({ ...add, address: e.target.value })} placeholder="Address" aria-label="Address" maxLength={300} />
+        </div>
+        <div className="row tight"><button type="button" className="btn sm primary" onClick={save} disabled={!add.name.trim()}>Add the place</button><button type="button" className="btn sm ghost" onClick={() => setAdd(null)}>Cancel</button></div>
+      </div> : <button type="button" className="btn sm self-start" onClick={() => setAdd({ name: '', address: '', lat: null, lon: null, ref: '' })}><Icon name="plus" size={14} />Another place</button>}
+    </div>
   )
 }
 

@@ -84,7 +84,7 @@ export default function Game() {
               {gm.status === 'cancelled' && <span className="pill st-overdue"><Icon name="x-circle" size={12} />Cancelled{gm.cancel_reason ? `: ${gm.cancel_reason}` : ''}</span>}
               {gm.status === 'planned' && gm.title && <span><Icon name="clock" size={13} /> {when(gm.starts_at, true)}</span>}
               {gm.status === 'planned' && <span><Icon name="timer" size={13} /> {gm.duration_min} min</span>}
-              {where && <a href={mapURL} target="_blank" rel="noreferrer"><Icon name="pin" size={13} /> {where}{addr ? `, ${addr}` : ''}</a>}
+              {where && !(gm.status === 'voting' && d.options.some(o => o.venue_name)) && <a href={mapURL} target="_blank" rel="noreferrer"><Icon name="pin" size={13} /> {where}{addr ? `, ${addr}` : ''}</a>}
               {gm.cost_cents > 0 && <span><Icon name="wallet" size={13} /> {money(gm.cost_cents, gm.currency)}{d.share_cost ? ` · ${money(d.share_cost, gm.currency)} each` : ''}</span>}
               {gm.auto && <span className="muted"><Icon name="repeat" size={13} /> the usual game</span>}
             </div>
@@ -150,7 +150,7 @@ function Voting({ d, busy, onSaved }: { d: GameDetail; busy: Record<string, stri
   const voters = new Set(d.options.flatMap(o => Object.keys(o.votes)))
   return (
     <section className="stack">
-      <div className="sec-head"><Icon name="calendar" size={16} /><h3>Which times suit you?</h3><span className="muted small">{voters.size} of {d.people.length} voted{d.game.vote_until ? ` · until ${when(d.game.vote_until)}` : ''}</span></div>
+      <div className="sec-head"><Icon name="calendar" size={16} /><h3>{new Set(d.options.map(o => o.venue_name).filter(Boolean)).size > 1 ? 'When and where suits you?' : 'Which times suit you?'}</h3><span className="muted small">{voters.size} of {d.people.length} voted{d.game.vote_until ? ` · until ${when(d.game.vote_until)}` : ''}</span></div>
       <div className="card flush">{d.options.map(o => {
         const yes = Object.entries(o.votes).filter(([, v]) => v === 'yes').map(([k]) => names[k] || '?')
         const maybe = Object.entries(o.votes).filter(([, v]) => v === 'maybe').map(([k]) => names[k] || '?')
@@ -158,6 +158,7 @@ function Voting({ d, busy, onSaved }: { d: GameDetail; busy: Record<string, stri
           <div key={o.id} className="opt-row">
             <div className="grow min0">
               <div className="row-title">{when(o.starts_at)}</div>
+              {o.venue_name && <div className="small opt-venue"><Icon name="pin" size={11} /> {o.venue_name}{o.venue_address ? `, ${o.venue_address}` : ''}</div>}
               <div className="muted small ellipsis">{yes.length} yes{yes.length ? ` (${yes.map(n => n.split(' ')[0]).join(', ')})` : ''}{maybe.length ? ` · ${maybe.length} maybe` : ''}</div>
               {busy[o.starts_at]?.length > 0 && <div className="small warn-text"><Icon name="calendar" size={11} /> You have: {busy[o.starts_at].join('; ')}</div>}
             </div>
