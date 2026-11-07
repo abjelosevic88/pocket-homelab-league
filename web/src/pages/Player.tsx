@@ -1,5 +1,6 @@
 // One person in a group: their line in the table, their rating over time,
 // how they do against (and with) everyone, and their last matches.
+import { useCallback, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { fmtDate } from '../lib/format'
@@ -75,9 +76,26 @@ function streakWords(s: string): string {
   return s[0] === 'W' ? `${n} ${n === 1 ? 'win' : 'wins'} in a row` : s[0] === 'L' ? `${n} ${n === 1 ? 'loss' : 'losses'} in a row` : `${n} ${n === 1 ? 'draw' : 'draws'} in a row`
 }
 
+/** The element's real width, so a chart draws 1:1 and its text, dots and corners keep their shape. */
+function useWidth(fallback: number) {
+  const [w, setW] = useState(fallback)
+  const ro = useRef<ResizeObserver | null>(null)
+  const ref = useCallback((el: Element | null) => {
+    ro.current?.disconnect()
+    ro.current = null
+    if (!el) return
+    const measure = () => { const cw = Math.round(el.getBoundingClientRect().width); if (cw > 0) setW(cw) }
+    measure()
+    ro.current = new ResizeObserver(measure)
+    ro.current.observe(el)
+  }, [])
+  return [ref, w] as const
+}
+
 /** A small line of the rating over time (an SVG, no library). */
 function RatingLine({ points }: { points: { at: string; rating: number }[] }) {
-  const w = 600, h = 120, pad = 18
+  const [ref, w] = useWidth(600)
+  const h = 130, pad = 18
   const vals = points.map(p => p.rating)
   const lo = Math.min(...vals, 1000) - 10, hi = Math.max(...vals, 1000) + 10
   const x = (i: number) => pad + (i / Math.max(points.length - 1, 1)) * (w - 2 * pad)
@@ -85,7 +103,7 @@ function RatingLine({ points }: { points: { at: string; rating: number }[] }) {
   const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.rating).toFixed(1)}`).join(' ')
   const last = points[points.length - 1]
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="rating-line" role="img" aria-label={`Rating from ${points[0].rating} to ${last.rating}`}>
+    <svg ref={ref} viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="rating-line" role="img" aria-label={`Rating from ${points[0].rating} to ${last.rating}`}>
       <line x1={pad} x2={w - pad} y1={y(1000)} y2={y(1000)} className="rl-base" />
       <text x={w - pad} y={y(1000) - 4} className="rl-lbl" textAnchor="end">1000</text>
       <path d={d} className="rl-path" />
