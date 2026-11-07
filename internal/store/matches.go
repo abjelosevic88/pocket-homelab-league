@@ -93,7 +93,7 @@ func (s *Store) ListMatches(ctx context.Context, uid int64, f MatchFilter) ([]*M
 }
 
 func (s *Store) fillPlayers(ctx context.Context, byID map[int64]*Match, where string, args []any) error {
-	rows, err := s.DB.QueryContext(ctx, `SELECT match_id, user_id, side, score, place FROM match_players
+	rows, err := s.DB.QueryContext(ctx, `SELECT match_id, user_id, side, score, place, stats FROM match_players
 		WHERE match_id IN (SELECT id FROM matches `+where+`) ORDER BY side, place, user_id`, args...)
 	if err != nil {
 		return err
@@ -102,8 +102,12 @@ func (s *Store) fillPlayers(ctx context.Context, byID map[int64]*Match, where st
 	for rows.Next() {
 		var mid int64
 		var p MatchPlayer
-		if err := rows.Scan(&mid, &p.UserID, &p.Side, &p.Score, &p.Place); err != nil {
+		var stats string
+		if err := rows.Scan(&mid, &p.UserID, &p.Side, &p.Score, &p.Place, &stats); err != nil {
 			return err
+		}
+		if stats != "" && stats != "{}" {
+			_ = json.Unmarshal([]byte(stats), &p.Stats)
 		}
 		if m := byID[mid]; m != nil {
 			m.Players = append(m.Players, p)
@@ -157,8 +161,8 @@ func (s *Store) SaveMatch(ctx context.Context, uid int64, m *Match) error {
 		}
 	}
 	for _, p := range m.Players {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO match_players (match_id, user_id, side, score, place) VALUES (?, ?, ?, ?, ?)`,
-			m.ID, p.UserID, p.Side, nullF(p.Score), p.Place); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO match_players (match_id, user_id, side, score, place, stats) VALUES (?, ?, ?, ?, ?, ?)`,
+			m.ID, p.UserID, p.Side, nullF(p.Score), p.Place, statsJSON(p.Stats)); err != nil {
 			return conflict(err)
 		}
 	}
@@ -191,4 +195,12 @@ func (s *Store) AutoConfirm(ctx context.Context, before string) ([]int64, error)
 func (s *Store) DeleteMatch(ctx context.Context, id int64) error {
 	_, err := s.DB.ExecContext(ctx, `DELETE FROM matches WHERE id = ?`, id)
 	return err
+}
+
+func statsJSON(m map[string]int) string {
+	if len(m) == 0 {
+		return "{}"
+	}
+	b, _ := json.Marshal(m)
+	return string(b)
 }

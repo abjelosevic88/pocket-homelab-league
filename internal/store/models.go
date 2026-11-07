@@ -237,10 +237,11 @@ type Score struct {
 
 // MatchPlayer is one player in a match.
 type MatchPlayer struct {
-	UserID int64    `json:"user_id"`
-	Side   string   `json:"side"`
-	Score  *float64 `json:"score"`
-	Place  int      `json:"place"`
+	UserID int64          `json:"user_id"`
+	Side   string         `json:"side"`
+	Score  *float64       `json:"score"`
+	Place  int            `json:"place"`
+	Stats  map[string]int `json:"stats,omitempty"` // assists, cards, aces …
 }
 
 // Message is a line in a group's chat or under a game.

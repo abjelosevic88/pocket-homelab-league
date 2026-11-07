@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { announceChange, useData } from '../lib/data'
-import { localTS, sideName } from '../lib/league'
+import { localTS, sideName, statInfo } from '../lib/league'
 import type { GameDetail, Group, Match, Member } from '../lib/types'
 import { Icon } from './icons'
 import { Select } from './Select'
@@ -29,6 +29,8 @@ export function ResultForm({ groupId, gameId, match, onClose, onSaved }: { group
   const [playedAt, setPlayedAt] = useState(match?.played_at || localTS(new Date()))
   const [note, setNote] = useState(match?.note || '')
   const [scorers, setScorers] = useState(false)
+  const [stats, setStats] = useState<Record<number, Record<string, string>>>({})
+  const [showStats, setShowStats] = useState(false)
   const [busy, setBusy] = useState(false)
   const gameID = match?.game_id || gameId || 0
 
@@ -45,8 +47,9 @@ export function ResultForm({ groupId, gameId, match, onClose, onSaved }: { group
     if (!group || !members) return
     if (match) {
       const s: Record<number, Side> = {}, sc: Record<number, string> = {}
-      for (const p of match.players) { s[p.user_id] = p.side || 'a'; if (p.score != null) sc[p.user_id] = String(p.score) }
-      setSides(s); setScores(sc)
+      const st: Record<number, Record<string, string>> = {}
+      for (const p of match.players) { s[p.user_id] = p.side || 'a'; if (p.score != null) sc[p.user_id] = String(p.score); if (p.stats) st[p.user_id] = Object.fromEntries(Object.entries(p.stats).map(([k, v]) => [k, String(v)])) }
+      setSides(s); setScores(sc); setStats(st); if (Object.keys(st).length) setShowStats(true)
       if (match.score.sets) setSets(match.score.sets.map(x => [String(x[0]), String(x[1])]))
       if (match.score.a != null) setAB([String(match.score.a), String(match.score.b ?? '')])
       setWinner(match.winner)
@@ -86,7 +89,8 @@ export function ResultForm({ groupId, gameId, match, onClose, onSaved }: { group
     e.preventDefault()
     const players = Object.entries(sides).filter(([, s]) => s).map(([id, s]) => {
       const v = scores[Number(id)]
-      return { user_id: Number(id), side: ranking ? '' : s, score: v !== undefined && v !== '' ? Number(v.replace(',', '.')) : null, place: 0 }
+      const st = Object.fromEntries(Object.entries(stats[Number(id)] || {}).filter(([, x]) => Number(x) > 0).map(([k, x]) => [k, Number(x)]))
+      return { user_id: Number(id), side: ranking ? '' : s, score: v !== undefined && v !== '' ? Number(v.replace(',', '.')) : null, place: 0, stats: st }
     })
     const score: Record<string, unknown> = {}
     if (group.scoring === 'sets') score.sets = sets.filter(x => x[0] !== '' || x[1] !== '').map(x => [Number(x[0]) || 0, Number(x[1]) || 0])
@@ -174,6 +178,18 @@ export function ResultForm({ groupId, gameId, match, onClose, onSaved }: { group
             <label key={id} className="scorer"><span className="ellipsis">{names[String(id)]}</span>
               <input inputMode="decimal" value={scores[id] || ''} onChange={e => setScores(s => ({ ...s, [id]: e.target.value }))} aria-label={`${names[String(id)]}'s score`} required /></label>
           ))}</div>
+        </div>}
+        {(group.stats || []).length > 0 && [...sideA, ...sideB].length > 0 && <div className="form-sec">
+          <button type="button" className="linkish self-start" onClick={() => setShowStats(x => !x)} aria-expanded={showStats}><Icon name={showStats ? 'chevron-up' : 'chevron-down'} size={14} /> {showStats ? 'Hide' : 'Add'} {group.stats.map(k => statInfo(k).name.toLowerCase()).join(', ')}</button>
+          {showStats && <div className="scroll-x"><table className="table stat-in">
+            <thead><tr><th>Player</th>{group.stats.map(k => <th key={k} className="num" title={statInfo(k).name}>{statInfo(k).icon}<span className="hide-sm"> {statInfo(k).name}</span></th>)}</tr></thead>
+            <tbody>{[...sideA, ...sideB].map(id => (
+              <tr key={id}><td className="ellipsis">{names[String(id)]}</td>{group.stats.map(k => (
+                <td key={k} className="num"><input inputMode="numeric" value={stats[id]?.[k] || ''} placeholder="0" aria-label={`${names[String(id)]}: ${statInfo(k).name}`}
+                  onChange={e => setStats(s => ({ ...s, [id]: { ...(s[id] || {}), [k]: e.target.value.replace(/\D/g, '').slice(0, 3) } }))} /></td>
+              ))}</tr>
+            ))}</tbody>
+          </table></div>}
         </div>}
         <Field label="Note (optional)"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Tie-break in the third, great rally at 5–5" maxLength={500} /></Field>
         <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy}>{match ? 'Save' : 'Save the result'}</button></div>

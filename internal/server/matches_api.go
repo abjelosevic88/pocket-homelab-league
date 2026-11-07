@@ -131,10 +131,20 @@ func (s *Server) buildMatch(ctx context.Context, g *store.Group, in matchInput, 
 	for _, id := range ids {
 		members[id] = true
 	}
-	for _, p := range in.Players {
+	for i, p := range in.Players {
 		if !members[p.UserID] {
 			return "every player must be in the group"
 		}
+		clean := map[string]int{}
+		for k, v := range p.Stats {
+			if !league.ValidStat(k) || v < 0 || v > 999 {
+				return "a stat is out of range"
+			}
+			if v > 0 {
+				clean[k] = v
+			}
+		}
+		in.Players[i].Stats = clean
 	}
 	m.PlayedAt, m.Players, m.Score, m.Winner, m.Note = in.PlayedAt, in.Players, in.Score, in.Winner, clip(strings.TrimSpace(in.Note), 500)
 	if err := league.Check(league.RulesOf(g), m); err != nil {
@@ -396,19 +406,42 @@ func periodStart(p string, now time.Time) string {
 
 // table works out a group's table for a period.
 func (s *Server) table(ctx context.Context, g *store.Group, period string) (*league.Table, []*store.Match) {
-	from := periodStart(period, time.Now())
-	ms, _ := s.store.ListMatches(ctx, 0, store.MatchFilter{GroupID: g.ID, From: from, Oldest: true})
+	return s.tableBetween(ctx, g, periodStart(period, time.Now()), "")
+}
+
+// tableBetween works out a group's table from the matches between two moments.
+func (s *Server) tableBetween(ctx context.Context, g *store.Group, from, to string) (*league.Table, []*store.Match) {
+	ms, _ := s.store.ListMatches(ctx, 0, store.MatchFilter{GroupID: g.ID, From: from, To: to, Oldest: true})
 	ids, _ := s.store.MemberIDs(ctx, g.ID)
 	t := league.Compute(league.RulesOf(g), ms, ids)
 	mvps, _ := s.store.GroupMVPs(ctx, g.ID, from)
+	stats := map[int64]map[string]int{}
+	for _, m := range ms {
+		for _, p := range m.Players {
+			for k, v := range p.Stats {
+				if stats[p.UserID] == nil {
+					stats[p.UserID] = map[string]int{}
+				}
+				stats[p.UserID][k] += v
+			}
+		}
+	}
 	for _, row := range t.Rows {
 		row.MVP = mvps[row.UserID]
+		row.Stats = stats[row.UserID]
 	}
 	return t, ms
 }
 
-// ratings are everyone's current ratings in a group (all time).
+// ratings are everyone's current ratings in a group: over all time, or —
+// when the group starts ratings fresh each season — in the season that is on.
 func (s *Server) ratings(ctx context.Context, g *store.Group) map[int64]float64 {
+	if g.RatingScope == "season" {
+		if x := s.store.CurrentSeason(ctx, g.ID, store.LocalNow()[:10]); x != nil {
+			t, _ := s.tableBetween(ctx, g, x.StartsOn+"T00:00", seasonEnd(x))
+			return t.Ratings()
+		}
+	}
 	t, _ := s.table(ctx, g, "all")
 	return t.Ratings()
 }
@@ -419,23 +452,21 @@ func (s *Server) handleTable(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if sid := int64(queryInt(r, "season")); sid > 0 {
+		x, err := s.store.GetSeason(ctx, sid)
+		if err != nil || x.GroupID != g.ID {
+			writeErr(w, http.StatusNotFound, "not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, s.seasonTable(ctx, g, x))
+		return
+	}
 	period := r.URL.Query().Get("period")
 	if !oneOf(period, []string{"all", "year", "season", "month", "90d"}) {
 		period = "all"
 	}
 	t, ms := s.table(ctx, g, period)
-	names := s.names(ctx, g.ID)
-	type row struct {
-		*league.Row
-		Name   string `json:"name"`
-		Member bool   `json:"member"`
-	}
-	rows := make([]row, 0, len(t.Rows))
-	for _, x := range t.Rows {
-		n, member := names[x.UserID]
-		rows = append(rows, row{Row: x, Name: firstNonEmpty(n, "Former player"), Member: member})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"period": period, "rows": rows, "matches": len(ms), "rules": league.RulesOf(g), "group": viewGroup(g)})
+	writeJSON(w, http.StatusOK, map[string]any{"period": period, "rows": s.tableRows(ctx, g, t), "matches": len(ms), "rules": league.RulesOf(g), "group": viewGroup(g)})
 }
 
 // handlePlayer is one person's page in a group: their line in the table,

@@ -298,3 +298,56 @@ func TestWhoOwesWhat(t *testing.T) {
 	}
 	a.expect(404, a.bob, "DELETE", "/api/v1/money/999", nil)
 }
+
+func TestSeasonsAndStats(t *testing.T) {
+	a := newApp(t, nil)
+	g := a.ok(a.alice, "POST", "/api/v1/groups", map[string]any{"name": "Friday Football", "sport": "football"})
+	if st := g["stats"].([]any); len(st) == 0 {
+		t.Fatalf("football counts assists, cards …: %v", g["stats"])
+	}
+	gid := id(g)
+	p := "/api/v1/groups/" + gid
+	a.ok(a.alice, "POST", p+"/members", map[string]any{"name": "Bob", "email": "bob@example.com"})
+	old := time.Now().AddDate(0, -2, 0).Format("2006-01-02")
+	a.expect(403, a.bob, "POST", p+"/seasons", map[string]any{"name": "Spring", "starts_on": old})
+	x := a.ok(a.alice, "POST", p+"/seasons", map[string]any{"name": "Spring", "starts_on": old})
+	match := func(at string, assists int) {
+		a.ok(a.alice, "POST", p+"/matches", map[string]any{"played_at": at, "score": map[string]any{"a": 3, "b": 1},
+			"players": []map[string]any{{"user_id": a.ids["Alice"], "side": "a", "stats": map[string]int{"assists": assists}}, {"user_id": a.ids["Bob"], "side": "b"}}})
+	}
+	match(time.Now().AddDate(0, -3, 0).Format("2006-01-02T15:04"), 1) // before the season
+	match(time.Now().AddDate(0, 0, -7).Format("2006-01-02T15:04"), 2)
+	a.expect(400, a.alice, "POST", p+"/matches", map[string]any{"score": map[string]any{"a": 1, "b": 0},
+		"players": []map[string]any{{"user_id": a.ids["Alice"], "side": "a", "stats": map[string]int{"nonsense": 1}}, {"user_id": a.ids["Bob"], "side": "b"}}})
+	all := a.ok(a.bob, "GET", p+"/table", nil)
+	top := all["rows"].([]any)[0].(map[string]any)
+	if num(top["stats"].(map[string]any), "assists") != 3 {
+		t.Fatalf("all-time assists: %v", top)
+	}
+	sea := a.ok(a.bob, "GET", p+"/table?season="+id(x), nil)
+	stop := sea["rows"].([]any)[0].(map[string]any)
+	if num(stop, "played") != 1 || num(stop["stats"].(map[string]any), "assists") != 2 || sea["frozen"] != false {
+		t.Fatalf("season table: %v", sea)
+	}
+	next := time.Now().Format("2006-01-02")
+	closed := a.ok(a.alice, "POST", "/api/v1/seasons/"+id(x)+"/close", map[string]any{"next": map[string]any{"name": "Summer", "starts_on": next}})
+	aw := closed["awards"].([]any)
+	if len(aw) < 2 || aw[0].(map[string]any)["name"] != "Alice" {
+		t.Fatalf("awards: %v", aw)
+	}
+	// a result entered later doesn't change the closed table
+	match(time.Now().AddDate(0, 0, -6).Format("2006-01-02T15:04"), 5)
+	sea = a.ok(a.bob, "GET", p+"/table?season="+id(x), nil)
+	if sea["frozen"] != true || num(sea["rows"].([]any)[0].(map[string]any), "played") != 1 {
+		t.Fatalf("frozen table: %v", sea)
+	}
+	ss := a.ok(a.bob, "GET", p+"/seasons", nil)
+	if len(ss["seasons"].([]any)) != 2 || num(ss, "current") == 0 {
+		t.Fatalf("seasons: %v", ss)
+	}
+	// Bob can't see another group's season
+	other := a.ok(a.alice, "POST", "/api/v1/groups", map[string]any{"name": "Private", "sport": "tennis"})
+	ox := a.ok(a.alice, "POST", "/api/v1/groups/"+id(other)+"/seasons", map[string]any{"name": "X", "starts_on": next})
+	a.expect(404, a.bob, "POST", "/api/v1/seasons/"+id(ox)+"/close", nil)
+	a.expect(404, a.bob, "GET", p+"/table?season="+id(ox), nil)
+}

@@ -1,12 +1,12 @@
 // One group: its games, chat, table, results and people.
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { announceChange, useAppState, useLiveEvents, useOnChange } from '../lib/data'
 import { fmtDate, fmtDateTime } from '../lib/format'
-import { WEEKDAYS, money, when } from '../lib/league'
-import type { Game, Group as GroupT, Match, Member, Reliability, Row, Venue } from '../lib/types'
+import { WEEKDAYS, money, statInfo, when } from '../lib/league'
+import type { Award, Game, Group as GroupT, Match, Member, Reliability, Row, Season, Venue } from '../lib/types'
 import { cap, FormDots, GameCard, MatchRow } from '../components/Bits'
 import { Chat } from '../components/Chat'
 import { GroupForm } from '../components/GroupForm'
@@ -17,7 +17,8 @@ import { MoneyTab } from '../components/MoneyTab'
 import { ResultForm } from '../components/ResultForm'
 import { TournamentList } from './Tournaments'
 import type { Tournament } from '../lib/tour'
-import { Avatar, Confirm, Empty, Loading, type MenuItem, MenuButton, Segmented, Tabs, useToast } from '../components/ui'
+import { Avatar, Confirm, Empty, Field, Loading, type MenuItem, MenuButton, Modal, Segmented, Tabs, useToast } from '../components/ui'
+import { Select } from '../components/Select'
 
 type Tab = 'games' | 'chat' | 'table' | 'results' | 'tournaments' | 'money' | 'people'
 interface Detail { group: GroupT; members: Member[]; upcoming: Game[]; feed_url: string; venues: Venue[] }
@@ -122,24 +123,60 @@ function GamesTab({ d }: { d: Detail }) {
   )
 }
 
-const PERIODS = [{ value: 'all', label: 'All time' }, { value: 'year', label: 'This year' }, { value: 'season', label: 'Season' }, { value: 'month', label: 'Month' }]
+const PERIODS = [{ value: 'all', label: 'All time' }, { value: 'year', label: 'This year' }, { value: 'month', label: 'Month' }]
+
+interface TableResp { rows: Row[]; frozen?: boolean; awards?: Award[]; season?: Season }
 
 function TableTab({ g }: { g: GroupT }) {
-  const [period, setPeriod] = useState('all')
-  const [rows, setRows] = useState<Row[] | null>(null)
-  const load = useCallback(() => api.get<{ rows: Row[] }>(`${V1}/groups/${g.id}/table?period=${period}`).then(r => setRows(r.rows)).catch(() => setRows([])), [g.id, period])
+  const { toast } = useToast()
+  const org = g.my_role === 'organiser'
+  const [seasons, setSeasons] = useState<{ seasons: Season[]; current: number } | null>(null)
+  const [sel, setSel] = useState<string>('')
+  const [t, setT] = useState<TableResp | null>(null)
+  const [newSeason, setNewSeason] = useState<{ name: string; starts_on: string; ends_on: string } | null>(null)
+  const [closing, setClosing] = useState<Season | null>(null)
+  const loadSeasons = useCallback(() => api.get<{ seasons: Season[]; current: number }>(`${V1}/groups/${g.id}/seasons`).then(r => { setSeasons(r); setSel(x => x || (r.current ? `s${r.current}` : 'all')) }).catch(() => { setSeasons({ seasons: [], current: 0 }); setSel(x => x || 'all') }), [g.id])
+  useEffect(() => { loadSeasons() }, [loadSeasons])
+  const load = useCallback(() => {
+    if (!sel) return
+    const q = sel.startsWith('s') ? `season=${sel.slice(1)}` : `period=${sel}`
+    return api.get<TableResp>(`${V1}/groups/${g.id}/table?${q}`).then(setT).catch(() => setT({ rows: [] }))
+  }, [g.id, sel])
   useEffect(() => { load() }, [load])
-  useLiveEvents(e => { if (e.type === 'match' && e.data.group_id === g.id) load() })
+  useLiveEvents(e => { if (e.type === 'match' && e.data.group_id === g.id) load(); if (e.type === 'group' && (e.data as { id?: number }).id === g.id) loadSeasons() })
+  const rows = t?.rows || null
+  const season = sel.startsWith('s') ? seasons?.seasons.find(x => `s${x.id}` === sel) : undefined
   const ranking = g.scoring === 'ranking'
   const sets = g.scoring === 'sets'
   const draws = g.draw_points > 0 || g.scoring === 'goals'
   const goals = g.scoring === 'goals' && g.format === 'teams'
+  const statCols = (g.stats || []).filter(k => (rows || []).some(r => r.stats?.[k]))
   const played = (rows || []).filter(r => r.played > 0)
   const resting = (rows || []).filter(r => r.played === 0 && r.member)
+  const today = new Date().toISOString().slice(0, 10)
+  const seasonOpts = (seasons?.seasons || []).map(x => ({ value: `s${x.id}`, label: x.name, hint: x.closed_at ? 'closed' : x.id === seasons?.current ? 'now' : undefined }))
+  const addSeason = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!newSeason) return
+    try { const x = await api.post<Season>(`${V1}/groups/${g.id}/seasons`, newSeason); setNewSeason(null); await loadSeasons(); setSel(`s${x.id}`); toast('Season started') } catch (err) { toast((err as Error).message, 'err') }
+  }
+  const seasonMenu = (x: Season): MenuItem[] => [
+    ...(!x.closed_at ? [{ label: 'Close the season…', icon: 'flag', onSelect: () => setClosing(x) }] : [{ label: 'Open it again', icon: 'undo', onSelect: async () => { try { await api.post(`${V1}/seasons/${x.id}/close`, { reopen: true }); loadSeasons(); load() } catch (e) { toast((e as Error).message, 'err') } } }]),
+    { label: 'Delete the season', icon: 'trash', danger: true, onSelect: async () => { try { await api.del(`${V1}/seasons/${x.id}`); setSel('all'); loadSeasons() } catch (e) { toast((e as Error).message, 'err') } } },
+  ]
   return (
     <div className="stack">
-      <div className="row wrap"><Segmented size="sm" value={period} onChange={setPeriod} options={PERIODS} /><span className="spacer" /><span className="muted small">Rating: everyone starts at 1000; beating someone rated higher moves you up more.</span></div>
-      {rows === null ? <Loading /> : played.length === 0 ? <Empty icon="chart" title="No results yet">Enter the first result and the table starts. <button type="button" className="linkish" onClick={() => openCreate('result', g.id)}>Enter a result</button></Empty> :
+      <div className="row wrap">
+        <Segmented size="sm" value={sel.startsWith('s') ? null : sel} onChange={setSel} options={PERIODS} />
+        {seasonOpts.length > 0 && <Select ariaLabel="Season" className="season-sel" value={sel.startsWith('s') ? sel : ''} placeholder="Seasons" onChange={v => v && setSel(v)} options={seasonOpts} />}
+        <span className="spacer" />
+        {org && <button type="button" className="btn sm" onClick={() => setNewSeason({ name: suggestSeason(), starts_on: today, ends_on: '' })}><Icon name="plus" size={14} />New season</button>}
+        {org && season && <MenuButton label="Season" items={() => seasonMenu(season)} align="right" width={220}><Icon name="more" size={16} /></MenuButton>}
+      </div>
+      {season && <p className="muted small">{season.name}: {fmtDate(season.starts_on, false)}{season.ends_on ? ` – ${fmtDate(season.ends_on, false)}` : ', still on'}{t?.frozen ? ' · the final table' : ''}{g.rating_scope === 'season' ? ' · ratings start at 1000 each season' : ''}</p>}
+      {t?.frozen && (t.awards || []).length > 0 && <div className="awards">{t.awards!.map(a => (
+        <div key={a.key} className={`award ${a.key.startsWith('place') ? 'medal' : ''}`}><span className="award-ico" aria-hidden="true">{a.icon}</span><span className="grow min0"><span className="muted small block-line">{a.title}</span><b className="ellipsis block-line">{a.name}</b><span className="muted small">{a.value}</span></span></div>
+      ))}</div>}
+      {rows === null ? <Loading /> : played.length === 0 ? <Empty icon="chart" title="No results yet">{season ? 'No results in this season yet.' : 'Enter the first result and the table starts.'} <button type="button" className="linkish" onClick={() => openCreate('result', g.id)}>Enter a result</button></Empty> :
         <div className="card flush scroll-x">
           <table className="table league-table">
             <thead><tr>
@@ -149,6 +186,7 @@ function TableTab({ g }: { g: GroupT }) {
                 <th className="num hide-sm" title={sets ? 'Games won and lost' : 'Scored and conceded'}>{sets ? 'Games' : '+/−'}</th>
               </>}
               {goals && <th className="num hide-sm" title="Own goals scored">⚽</th>}
+              {statCols.map(k => <th key={k} className="num hide-sm" title={statInfo(k).name}>{statInfo(k).icon}</th>)}
               <th className="num" title="Points">Pts</th>
               <th className="hide-sm">Form</th><th className="num" title="Rating">Rating</th>
             </tr></thead>
@@ -162,15 +200,60 @@ function TableTab({ g }: { g: GroupT }) {
                   <td className="num hide-sm muted">{sets ? `${r.for}–${r.against}` : `${r.for - r.against > 0 ? '+' : ''}${r.for - r.against}`}</td>
                 </>}
                 {goals && <td className="num hide-sm">{r.scored || ''}</td>}
+                {statCols.map(k => <td key={k} className="num hide-sm">{r.stats?.[k] || ''}</td>)}
                 <td className="num"><b>{r.points}</b></td>
                 <td className="hide-sm"><FormDots form={r.form} /></td>
-                <td className="num tnum">{r.rating}{r.change !== 0 && <span className={`rt-ch ${r.change > 0 ? 'up' : 'down'}`}>{r.change > 0 ? '+' : ''}{Math.round(r.change)}</span>}</td>
+                <td className="num tnum">{Math.round(r.rating)}{r.change !== 0 && !t?.frozen && <span className={`rt-ch ${r.change > 0 ? 'up' : 'down'}`}>{r.change > 0 ? '+' : ''}{Math.round(r.change)}</span>}</td>
               </tr>
             ))}</tbody>
           </table>
         </div>}
-      {resting.length > 0 && <p className="muted small">Not played yet{period !== 'all' ? ' in this period' : ''}: {resting.map(r => r.name).join(', ')}</p>}
+      {resting.length > 0 && <p className="muted small">Not played yet{sel !== 'all' ? ' in this period' : ''}: {resting.map(r => r.name).join(', ')}</p>}
+      <p className="muted small">Rating: everyone starts at 1000; beating someone rated higher moves you up more.</p>
+      {newSeason && <Modal title="A new season" onClose={() => setNewSeason(null)} size="sm">
+        <form className="stack" onSubmit={addSeason}>
+          <Field label="Name"><input autoFocus value={newSeason.name} onChange={e => setNewSeason({ ...newSeason, name: e.target.value })} maxLength={60} required /></Field>
+          <div className="two-col tight">
+            <Field label="Starts"><input type="date" value={newSeason.starts_on} onChange={e => setNewSeason({ ...newSeason, starts_on: e.target.value })} required /></Field>
+            <Field label="Ends (optional)"><input type="date" value={newSeason.ends_on} min={newSeason.starts_on} onChange={e => setNewSeason({ ...newSeason, ends_on: e.target.value })} /></Field>
+          </div>
+          <p className="muted small">The season has its own table. Close it when it's over: the table and the awards are kept, and everyone hears who won.</p>
+          <div className="form-actions"><button type="button" className="btn" onClick={() => setNewSeason(null)}>Cancel</button><button className="btn primary">Start it</button></div>
+        </form>
+      </Modal>}
+      {closing && <CloseSeason x={closing} onClose={() => setClosing(null)} onDone={() => { setClosing(null); loadSeasons(); load() }} />}
     </div>
+  )
+}
+
+function suggestSeason(d = new Date()) {
+  const m = d.getMonth()
+  const name = m < 2 || m === 11 ? 'Winter' : m < 5 ? 'Spring' : m < 8 ? 'Summer' : 'Autumn'
+  return `${name} ${d.getFullYear()}`
+}
+
+function CloseSeason({ x, onClose, onDone }: { x: Season; onClose: () => void; onDone: () => void }) {
+  const { toast } = useToast()
+  const [next, setNext] = useState(true)
+  const tomorrow = new Date(Date.now() + 86400000)
+  const [name, setName] = useState(suggestSeason(new Date(Date.now() + 86400000 * 7)))
+  const [from, setFrom] = useState(tomorrow.toISOString().slice(0, 10))
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try { await api.post(`${V1}/seasons/${x.id}/close`, next ? { next: { name, starts_on: from } } : {}); toast(`${x.name} is closed — the awards are in the chat`); onDone() } catch (err) { toast((err as Error).message, 'err') }
+  }
+  return (
+    <Modal title={`Close ${x.name}?`} onClose={onClose} size="sm">
+      <form className="stack" onSubmit={go}>
+        <p>The table is kept as it is now, the awards are handed out (champion, most games, top scorer …) and everyone hears it.</p>
+        <label className="check-row"><input type="checkbox" checked={next} onChange={e => setNext(e.target.checked)} /> Start the next season</label>
+        {next && <div className="two-col tight">
+          <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} maxLength={60} required /></Field>
+          <Field label="Starts"><input type="date" value={from} onChange={e => setFrom(e.target.value)} required /></Field>
+        </div>}
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Not yet</button><button className="btn primary">Close the season</button></div>
+      </form>
+    </Modal>
   )
 }
 

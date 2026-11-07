@@ -3,7 +3,8 @@
 import { Link, useParams } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { fmtDate } from '../lib/format'
-import type { Group, Match, Row, Versus } from '../lib/types'
+import { statInfo } from '../lib/league'
+import type { Group, Match, Reliability, Row, Versus } from '../lib/types'
 import { FormDots, MatchRow } from '../components/Bits'
 import { Icon } from '../components/icons'
 import { useCrumb } from '../components/Layout'
@@ -14,6 +15,8 @@ interface PlayerView { user_id: number; name: string; row: Row | null; history: 
 export default function Player() {
   const { id, uid } = useParams()
   const { data: p, error } = useAsync(() => api.get<PlayerView>(`${V1}/groups/${id}/players/${uid}`), [id, uid])
+  const { data: rels } = useAsync(() => api.get<Reliability[]>(`${V1}/groups/${id}/reliability`).catch(() => [] as Reliability[]), [id])
+  const rel = rels?.find(x => String(x.user_id) === uid)
   useCrumb(p ? `${p.group.name} · ${p.name}` : undefined)
   if (error) return <Empty icon="alert" title="Not found"><Link to={`/groups/${id}`}>Back to the group</Link></Empty>
   if (!p) return <Loading />
@@ -38,6 +41,8 @@ export default function Player() {
           <div className="stat"><span className="stat-l">Form</span><span className="stat-v"><FormDots form={r.form} /></span><span className="stat-s small">{streakWords(r.streak)}</span></div>
           {r.scored > 0 && <div className="stat"><span className="stat-l">Scored</span><span className="stat-v tnum">{r.scored}</span><span className="stat-s small">{(r.scored / r.played).toFixed(1)} a game</span></div>}
           {r.mvp > 0 && <div className="stat"><span className="stat-l">Player of the game</span><span className="stat-v tnum">★ {r.mvp}</span></div>}
+          {Object.entries(r.stats || {}).filter(([, v]) => v > 0).map(([k, v]) => <div key={k} className="stat"><span className="stat-l">{statInfo(k).icon} {statInfo(k).name}</span><span className="stat-v tnum">{v}</span><span className="stat-s small">{(v / r.played).toFixed(1)} a match</span></div>)}
+          {rel && rel.games > 0 && <div className="stat"><span className="stat-l">Turns up</span><span className="stat-v tnum">{rel.score < 0 ? `${rel.came}/${rel.games}` : `${rel.score}%`}</span><span className="stat-s small">came {rel.came} of {rel.games}{rel.late_outs ? ` · ${rel.late_outs} late` : ''}{rel.no_shows ? ` · ${rel.no_shows} no-show` : ''}</span></div>}
         </div>
         {p.history.length > 1 && <section className="card pad-card stack">
           <div className="sec-head"><Icon name="trending-up" size={16} /><h3>Rating over time</h3></div>

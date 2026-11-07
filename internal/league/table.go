@@ -178,26 +178,27 @@ const StartRating = 1000.0
 
 // Row is one person's line in the table.
 type Row struct {
-	UserID   int64    `json:"user_id"`
-	Played   int      `json:"played"`
-	Won      int      `json:"won"`
-	Drawn    int      `json:"drawn"`
-	Lost     int      `json:"lost"`
-	Points   int      `json:"points"`
-	For      float64  `json:"for"`     // games / goals / points won (sets: games)
-	Against  float64  `json:"against"` // and lost
-	SetsWon  int      `json:"sets_won"`
-	SetsLost int      `json:"sets_lost"`
-	Scored   float64  `json:"scored"` // their own goals or points
-	Wins     int      `json:"wins"`   // ranking: first places
-	Best     *float64 `json:"best"`   // ranking: their best score
-	Average  *float64 `json:"average"`
-	Rating   float64  `json:"rating"`
-	Change   float64  `json:"change"` // the last match's change in rating
-	Form     []string `json:"form"`   // the last five: W | D | L (oldest first)
-	Streak   string   `json:"streak"` // "W3", "L1"
-	MVP      int      `json:"mvp"`
-	Position int      `json:"position"`
+	UserID   int64          `json:"user_id"`
+	Played   int            `json:"played"`
+	Won      int            `json:"won"`
+	Drawn    int            `json:"drawn"`
+	Lost     int            `json:"lost"`
+	Points   int            `json:"points"`
+	For      float64        `json:"for"`     // games / goals / points won (sets: games)
+	Against  float64        `json:"against"` // and lost
+	SetsWon  int            `json:"sets_won"`
+	SetsLost int            `json:"sets_lost"`
+	Scored   float64        `json:"scored"` // their own goals or points
+	Wins     int            `json:"wins"`   // ranking: first places
+	Best     *float64       `json:"best"`   // ranking: their best score
+	Average  *float64       `json:"average"`
+	Rating   float64        `json:"rating"`
+	Change   float64        `json:"change"` // the last match's change in rating
+	Form     []string       `json:"form"`   // the last five: W | D | L (oldest first)
+	Streak   string         `json:"streak"` // "W3", "L1"
+	MVP      int            `json:"mvp"`
+	Stats    map[string]int `json:"stats,omitempty"` // totals of what the group counts
+	Position int            `json:"position"`
 
 	total float64
 }

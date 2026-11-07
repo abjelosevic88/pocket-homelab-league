@@ -629,3 +629,12 @@ td.hide-sm, th.hide-sm { display: table-cell; }
 .ledger-ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); color: var(--text-2); }
 .ledger-ico.payment { background: var(--accent-soft); color: var(--accent-ink); }
 .input-suffix { display: inline-flex; align-items: center; padding: 0 10px; color: var(--muted); font-size: 13px; }
+.stat-in input { width: 52px; text-align: center; padding: 5px 4px; }
+.stat-in td, .stat-in th { padding: 5px 8px; }
+
+/* seasons */
+.season-sel { min-width: 170px; }
+.awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.award { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+.award.medal { background: color-mix(in srgb, #fab005 10%, var(--surface)); border-color: color-mix(in srgb, #fab005 35%, var(--border)); }
+.award-ico { font-size: 24px; line-height: 1; }

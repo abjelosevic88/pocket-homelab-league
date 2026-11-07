@@ -61,7 +61,7 @@ export interface Option { id: number; game_id: number; starts_at: string; venue_
 export interface Venue { id: number; group_id: number; name: string; address: string; lat: number | null; lon: number | null; ref: string }
 
 export interface Score { sets?: [number, number][]; a?: number; b?: number }
-export interface MatchPlayer { user_id: number; side: '' | 'a' | 'b'; score: number | null; place: number }
+export interface MatchPlayer { user_id: number; side: '' | 'a' | 'b'; score: number | null; place: number; stats?: Record<string, number> }
 export interface Match {
   id: number; group_id: number; game_id: number; user_id: number; played_at: string; score: Score; winner: '' | 'a' | 'b' | 'draw'; note: string
   confirmed_by: number; confirmed_at: string | null; disputed_by: number; dispute: string; players: MatchPlayer[]; created_at: string; updated_at: string
@@ -86,7 +86,7 @@ export interface SubOffer { id: number; offered_by: string; in_group: boolean; g
 export interface Row {
   user_id: number; name: string; member: boolean; played: number; won: number; drawn: number; lost: number; points: number; for: number; against: number
   sets_won: number; sets_lost: number; scored: number; wins: number; best: number | null; average: number | null; rating: number; change: number
-  form: ('W' | 'D' | 'L')[]; streak: string; mvp: number; position: number
+  form: ('W' | 'D' | 'L')[]; streak: string; mvp: number; position: number; stats?: Record<string, number>
 }
 
 export interface Versus { user_id: number; name: string; played: number; won: number; drawn: number; lost: number; together: number; together_won: number; last_played_at: string }
@@ -104,3 +104,6 @@ export interface AppState { slug: AppSlug; name: string; reason: string; mode: C
 
 export interface ResultItem { match: Match; group_name: string; emoji: string; group_color?: string; line?: string; won?: string }
 export interface Today { next: Game[]; unanswered: Game[]; voting: Game[]; confirm: ResultItem[]; unread: number; groups: number; recent: ResultItem[] }
+
+export interface Award { key: string; icon: string; title: string; user_id: number; name: string; value: string }
+export interface Season { id: number; group_id: number; name: string; starts_on: string; ends_on: string; closed_at: string | null; awards: Award[] }
