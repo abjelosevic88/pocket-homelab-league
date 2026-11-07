@@ -65,6 +65,8 @@ func (s *Server) Router() http.Handler {
 			r.Get("/auth/link/{token}", s.handlePeekLink)
 			r.Post("/auth/link", s.handleUseLink)
 			r.Post("/auth/link/request", s.handleRequestLink)
+			// a tournament's read-only page, for anyone with its link
+			r.Get("/public/t/{token}", s.handlePublicTournament)
 
 			r.Group(func(r chi.Router) {
 				r.Use(s.requireAuth)
@@ -110,6 +112,34 @@ func (s *Server) Router() http.Handler {
 				r.Get("/games/{id}/weather", s.handleGameWeather)
 				r.Get("/games/{id}/busy", s.handleGameBusy)
 				r.Delete("/made/{id}", s.handleDeleteMade)
+
+				// tournaments
+				r.Get("/tournaments", s.handleListTournaments)
+				r.Get("/tournaments/formats", s.handleTournamentFormats)
+				r.Get("/groups/{id}/tournaments", s.handleListTournaments)
+				r.Post("/groups/{id}/tournaments", s.handleCreateTournament)
+				r.Get("/tournaments/{id}", s.handleGetTournament)
+				r.Put("/tournaments/{id}", s.handleUpdateTournament)
+				r.Delete("/tournaments/{id}", s.handleDeleteTournament)
+				r.Post("/tournaments/{id}/join", s.handleJoinTournament)
+				r.Post("/tournaments/{id}/leave", s.handleLeaveTournament)
+				r.Post("/tournaments/{id}/entries", s.handleAddEntry)
+				r.Put("/tournaments/{id}/entries/{eid}", s.handleUpdateEntry)
+				r.Delete("/tournaments/{id}/entries/{eid}", s.handleDeleteEntry)
+				r.Post("/tournaments/{id}/from-game", s.handleEntriesFromGame)
+				r.Post("/tournaments/{id}/teams", s.handleFairTeams)
+				r.Post("/tournaments/{id}/start", s.handleStartTournament)
+				r.Post("/tournaments/{id}/redraw", s.handleRedraw)
+				r.Post("/tournaments/{id}/regenerate", s.handleRegenerate)
+				r.Post("/tournaments/{id}/finish", s.handleFinishTournament)
+				r.Post("/tournaments/{id}/next-round", s.handleNextSeason)
+				r.Put("/tournaments/{id}/scorecards", s.handleScorecard)
+				r.Post("/tournaments/{id}/challenges", s.handleChallenge)
+				r.Post("/tournaments/{id}/challenges/{cid}", s.handleChallengeAnswer)
+				r.Post("/tmatches/{id}/result", s.handleTMatchResult)
+				r.Post("/tmatches/{id}/confirm", s.handleTMatchConfirm)
+				r.Post("/tmatches/{id}/reopen", s.handleTMatchReopen)
+				r.Post("/tmatches/{id}/call", s.handleTMatchCall)
 
 				// results and the table
 				r.Get("/matches", s.handleListMatches)
