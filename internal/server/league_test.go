@@ -211,3 +211,14 @@ func TestSettingsArePersonal(t *testing.T) {
 		t.Fatalf("Alice's settings: %v", al)
 	}
 }
+
+func TestPublishesOnlyLeagueEvents(t *testing.T) {
+	if len(eventTopics) != 8 {
+		t.Fatalf("event topics: %v", eventTopics)
+	}
+	for _, e := range eventTopics {
+		if !strings.HasPrefix(e, "league.") {
+			t.Fatalf("not a League event: %s", e)
+		}
+	}
+}

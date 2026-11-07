@@ -222,7 +222,8 @@ func (s *Server) coreLoop(ctx context.Context) {
 }
 
 // eventTopics are what CRM publishes on the Core bus.
-var eventTopics = []string{"crm.deal_created", "crm.deal_moved", "crm.deal_won", "crm.deal_lost", "crm.steps_due"}
+var eventTopics = []string{"league.game_planned", "league.game_changed", "league.game_cancelled", "league.vote_started",
+	"league.answered", "league.short", "league.result", "league.reminder"}
 
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
