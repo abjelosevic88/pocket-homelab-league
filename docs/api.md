@@ -122,3 +122,7 @@ Rules: `{"kind":"tennis","sets":3,"games":6,"tiebreak_at":6,"tiebreak_to":7,"sup
 | `POST /groups/{id}/photos` | Upload a photo (multipart `file`, up to 15 MB) → `{id, url, thumb}`; send it with a message `{"body","photos":[id]}` |
 | `GET /photos/{id}?size=small` | A photo of a group you're in (re-encoded: no camera location) |
 | `GET /push/key` · `POST /push/subscribe` · `/unsubscribe` · `/test` | Notifications on this phone (Web Push, League's own key) |
+
+## Your data out and in
+
+`GET /export.json` (your groups as you see them: people, games with answers, results, places, chat) and `GET /export.csv` (every result). `POST /import` takes that JSON (multipart `file` or the raw body) and brings the groups back with you as organiser; it only adds, and a second run of the same file adds nothing. Pocket Move can copy your groups and results out and bring them in: `GET /pocket/portable` describes these, exports under the link scope `move:export`, the import under `move:import`.

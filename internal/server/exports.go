@@ -365,7 +365,12 @@ func (s *Server) importDoc(ctx context.Context, me *store.User, doc exportDoc) m
 			}
 		}
 	}
-	return map[string]any{"imported": res}
+	// the counts nested (for the page) and at the top level (what Pocket Move shows)
+	out := map[string]any{"imported": res}
+	for k, v := range res {
+		out[k] = v
+	}
+	return out
 }
 
 // handleImportPlayers adds a list of people (a CSV from Spond, TeamSnap,
